@@ -6,7 +6,6 @@ type AppAction =
   | { type: 'ADD_USER'; payload: User }
   | { type: 'SET_USERS'; payload: User[] }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'LOGOUT' }
   | { type: 'ADD_PROFESSIONAL_PROFILE'; payload: ProfessionalProfile }
   | { type: 'ADD_CLIENT_PROFILE'; payload: ClientProfile }
   | { type: 'UPDATE_PROFESSIONAL_PROFILE'; payload: ProfessionalProfile }
@@ -53,8 +52,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, users: action.payload };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
-    case 'LOGOUT':
-      return { ...state, currentUser: null };
     case 'ADD_PROFESSIONAL_PROFILE':
       return { 
         ...state, 

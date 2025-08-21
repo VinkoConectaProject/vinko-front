@@ -13,7 +13,6 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
   const { state, dispatch } = useApp();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -29,17 +28,10 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
     setIsLoading(true);
 
     console.log('=== DEBUG CADASTRO ===');
-    console.log('Username para cadastro:', formData.username);
     console.log('Email para cadastro:', formData.email);
 
     if (formData.password !== formData.confirmPassword) {
       setErrors(['As senhas não conferem']);
-      setIsLoading(false);
-      return;
-    }
-
-    if (formData.username.length < 3) {
-      setErrors(['O username deve ter pelo menos 3 caracteres']);
       setIsLoading(false);
       return;
     }
@@ -57,23 +49,17 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
       console.log('Usuários existentes:', users.map(u => ({ email: u.email, type: u.type })));
       
       const emailToCheck = formData.email.toLowerCase().trim();
-      const usernameToCheck = formData.username.toLowerCase().trim();
       console.log('Email normalizado para verificação:', emailToCheck);
-      console.log('Username normalizado para verificação:', usernameToCheck);
       
-      const userExists = users.find((u: UserType) => 
-        u.email.toLowerCase().trim() === emailToCheck || u.username.toLowerCase().trim() === usernameToCheck
+      const userExists = users.find((u: User) => 
+        u.email.toLowerCase().trim() === emailToCheck
       );
 
       console.log('Usuário já existe:', userExists ? 'SIM' : 'NÃO');
       
       if (userExists) {
-        console.log('Tentativa de cadastro com email/username existente:', userExists.email, userExists.username);
-        if (userExists.email.toLowerCase().trim() === emailToCheck) {
-          setErrors(['Este email já está cadastrado']);
-        } else {
-          setErrors(['Este username já está em uso']);
-        }
+        console.log('Tentativa de cadastro com email existente:', userExists.email);
+        setErrors(['Este email já está cadastrado']);
         setIsLoading(false);
         return;
       }
@@ -81,7 +67,6 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
       // Create new user
       const newUser: UserType = {
         id: Date.now().toString(),
-        username: formData.username.toLowerCase(),
         email: formData.email.toLowerCase(),
         password: formData.password,
         type: formData.userType,
@@ -93,7 +78,7 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
       dispatch({ type: 'ADD_USER', payload: newUser });
       dispatch({ type: 'SET_USER', payload: newUser });
       
-      console.log('Novo usuário criado:', { username: newUser.username, email: newUser.email, type: newUser.type });
+      console.log('Novo usuário criado:', { email: newUser.email, type: newUser.type });
       console.log('Total de usuários após cadastro:', users.length + 1);
       console.log('=== FIM DEBUG CADASTRO ===');
 
@@ -197,24 +182,6 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
             ))}
           </div>
         )}
-
-        <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-            Username
-          </label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              id="username"
-              type="text"
-              value={formData.username}
-              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              placeholder="seu_username"
-              required
-            />
-          </div>
-        </div>
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">

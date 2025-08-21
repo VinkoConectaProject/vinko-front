@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { User as UserType } from '../../types';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -12,6 +13,7 @@ interface LoginFormProps {
 export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBackToLanding }: LoginFormProps) {
   const { state, dispatch } = useApp(); // ✅ Agora sim você tem acesso a state.users
   const [formData, setFormData] = useState({
+    username: '',
     email: '',
     password: '',
   });
@@ -25,6 +27,7 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
     setIsLoading(true);
 
     console.log('=== DEBUG LOGIN ===');
+    console.log('Username digitado:', formData.username);
     console.log('Email digitado:', formData.email);
     console.log('Senha digitada:', formData.password);
 
@@ -35,18 +38,20 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
       console.log('Usuários salvos:', users.map(u => ({ email: u.email, type: u.type })));
       
       const emailToSearch = formData.email.toLowerCase().trim();
+      const usernameToSearch = formData.username.toLowerCase().trim();
       console.log('Email normalizado para busca:', emailToSearch);
+      console.log('Username normalizado para busca:', usernameToSearch);
       
-      const user = users.find((u: User) => 
-        u.email.toLowerCase().trim() === emailToSearch && 
+      const user = users.find((u: UserType) => 
+        (u.email.toLowerCase().trim() === emailToSearch || u.username.toLowerCase().trim() === usernameToSearch) && 
         u.password === formData.password
       );
 
       console.log('Usuário encontrado:', user ? 'SIM' : 'NÃO');
       
-      // Debug adicional - verificar se email existe mas senha está errada
-      const userByEmail = users.find((u: User) => 
-        u.email.toLowerCase().trim() === emailToSearch
+      // Debug adicional - verificar se email ou username existe mas senha está errada
+      const userByEmail = users.find((u: UserType) => 
+        u.email.toLowerCase().trim() === emailToSearch || u.username.toLowerCase().trim() === usernameToSearch
       );
       
       if (userByEmail && !user) {
@@ -62,11 +67,11 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
         onLogin(user);
       } else {
         if (userByEmail) {
-          console.log('Senha incorreta para email existente');
+          console.log('Senha incorreta para usuário existente');
           setErrors(['Senha incorreta']);
         } else {
-          console.log('Email não encontrado');
-          setErrors(['Email não cadastrado']);
+          console.log('Usuário não encontrado');
+          setErrors(['Email ou username não cadastrado']);
         }
       }
     } catch (error) {
@@ -96,6 +101,24 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
             ))}
           </div>
         )}
+
+        <div>
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+            Username
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              id="username"
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              placeholder="seu_username"
+              required
+            />
+          </div>
+        </div>
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">

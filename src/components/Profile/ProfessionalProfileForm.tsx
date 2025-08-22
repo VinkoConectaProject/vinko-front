@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, MapPin, Phone, Mail, Briefcase, Star, Save, Award } from 'lucide-react';
+import { User, MapPin, Phone, Mail, Briefcase, Star, Save, Award, MessageSquare } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { ProfessionalProfile } from '../../types';
+import { ProfessionalProfile, Rating } from '../../types';
 
 export function ProfessionalProfileForm() {
   const { state, dispatch } = useApp();
@@ -102,6 +102,25 @@ export function ProfessionalProfileForm() {
         ? prev.services.filter(s => s !== service)
         : [...(prev.services || []), service]
     }));
+  };
+
+  // Get ratings for current professional
+  const professionalRatings = state.ratings.filter(r => r.professionalId === state.currentUser?.id);
+  const averageRating = professionalRatings.length > 0 
+    ? professionalRatings.reduce((sum, r) => sum + r.stars, 0) / professionalRatings.length 
+    : 0;
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, index) => (
+      <Star
+        key={index}
+        className={`h-4 w-4 ${
+          index < rating
+            ? 'text-yellow-500 fill-current'
+            : 'text-gray-300'
+        }`}
+      />
+    ));
   };
 
   return (

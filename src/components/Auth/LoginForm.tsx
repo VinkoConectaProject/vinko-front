@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { User } from '../../types';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -10,7 +11,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBackToLanding }: LoginFormProps) {
-  const { state, dispatch } = useApp(); // ✅ Agora sim você tem acesso a state.users
+  const { state, dispatch } = useApp();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -24,48 +25,30 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
     setErrors([]);
     setIsLoading(true);
 
-    console.log('=== DEBUG LOGIN ===');
-    console.log('Email digitado:', formData.email);
-    console.log('Senha digitada:', formData.password);
 
     try {
       // Find user in context state
       const users = state.users;
-      console.log('Total de usuários salvos:', users.length);
-      console.log('Usuários salvos:', users.map(u => ({ email: u.email, type: u.type })));
       
       const emailToSearch = formData.email.toLowerCase().trim();
-      console.log('Email normalizado para busca:', emailToSearch);
       
       const user = users.find((u: User) => 
         u.email.toLowerCase().trim() === emailToSearch && 
         u.password === formData.password
       );
 
-      console.log('Usuário encontrado:', user ? 'SIM' : 'NÃO');
-      
-      // Debug adicional - verificar se email existe mas senha está errada
       const userByEmail = users.find((u: User) => 
         u.email.toLowerCase().trim() === emailToSearch
       );
       
-      if (userByEmail && !user) {
-        console.log('Email existe mas senha incorreta');
-        console.log('Senha salva:', userByEmail.password);
-        console.log('Senha digitada:', formData.password);
-      }
 
       if (user) {
-        console.log('Login bem-sucedido para:', user.email);
-        // Usar dispatch para atualizar o estado
         dispatch({ type: 'SET_USER', payload: user });
         onLogin(user);
       } else {
         if (userByEmail) {
-          console.log('Senha incorreta para email existente');
           setErrors(['Senha incorreta']);
         } else {
-          console.log('Email não encontrado');
           setErrors(['Email não cadastrado']);
         }
       }
@@ -74,7 +57,6 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
       setErrors(['Erro interno. Tente novamente.']);
     } finally {
       setIsLoading(false);
-      console.log('=== FIM DEBUG LOGIN ===');
     }
   };
 

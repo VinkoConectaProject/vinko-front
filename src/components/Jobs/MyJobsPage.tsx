@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Briefcase, Calendar, User, MessageSquare, CheckCircle, Clock, Star, DollarSign } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
@@ -6,14 +6,39 @@ export function MyJobsPage() {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState('active');
 
-  const myJobs = state.demands.filter(d => d.selectedProfessional === state.currentUser?.id);
+  // 1. AJUSTE: Prestador que foi trocado deve voltar para candidaturas
+  const myActiveJobs = state.demands.filter(d => 
+    d.selectedProfessional === state.currentUser?.id && d.status === 'in_progress'
+  );
+  const myCompletedJobs = state.demands.filter(d => 
+    d.selectedProfessional === state.currentUser?.id && d.status === 'completed'
+  );
+  
+  // Candidaturas: prestador interessado mas não selecionado OU foi selecionado mas depois trocado
   const interestedJobs = state.demands.filter(d => 
-    d.interestedProfessionals.includes(state.currentUser?.id || '') && 
-    d.status === 'open'
+    d.interestedProfessionals.includes(state.currentUser?.id || '') &&
+    d.selectedProfessional !== state.currentUser?.id && // Não está atualmente selecionado
+    d.status !== 'cancelled' // Não foi cancelada
   );
 
-  const activeJobs = myJobs.filter(j => j.status === 'in_progress');
-  const completedJobs = myJobs.filter(j => j.status === 'completed');
+  const activeJobs = myActiveJobs;
+  const completedJobs = myCompletedJobs;
+
+  // 2. AJUSTE: Total = soma de candidaturas + ativos + concluídos (sem duplicar por jobId)
+  const totalJobs = useMemo(() => {
+    const allJobIds = new Set();
+    
+    // Adicionar candidaturas
+    interestedJobs.forEach(job => allJobIds.add(job.id));
+    
+    // Adicionar ativos  
+    activeJobs.forEach(job => allJobIds.add(job.id));
+    
+    // Adicionar concluídos
+    completedJobs.forEach(job => allJobIds.add(job.id));
+    
+    return allJobIds.size;
+  }, [interestedJobs, activeJobs, completedJobs]);
 
   const handleCompleteJob = (jobId: string) => {
     const job = state.demands.find(d => d.id === jobId);
@@ -51,6 +76,13 @@ export function MyJobsPage() {
     }
   };
 
+  const stats = [
+    { label: 'Trabalhos Ativos', value: activeJobs.length, color: 'text-blue-600', bg: 'bg-blue-100', icon: Briefcase },
+    { label: 'Concluídos', value: completedJobs.length, color: 'text-green-600', bg: 'bg-green-100', icon: CheckCircle },
+    { label: 'Candidaturas', value: interestedJobs.length, color: 'text-purple-600', bg: 'bg-purple-100', icon: Clock },
+    { label: 'Total', value: totalJobs, color: 'text-gray-600', bg: 'bg-gray-100', icon: Star },
+  ];
+
   return (
     <div className="py-8">
       <div className="mb-8">
@@ -62,12 +94,7 @@ export function MyJobsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        {[
-          { label: 'Trabalhos Ativos', value: activeJobs.length, color: 'text-blue-600', bg: 'bg-blue-100' },
-          { label: 'Concluídos', value: completedJobs.length, color: 'text-green-600', bg: 'bg-green-100' },
-          { label: 'Candidaturas', value: interestedJobs.length, color: 'text-purple-600', bg: 'bg-purple-100' },
-          { label: 'Total', value: myJobs.length, color: 'text-gray-600', bg: 'bg-gray-100' },
-        ].map((stat, index) => (
+        {stats.map((stat, index) => (
           <div key={index} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
@@ -75,7 +102,7 @@ export function MyJobsPage() {
                 <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
               </div>
               <div className={`p-3 rounded-lg ${stat.bg}`}>
-                <div className={`h-6 w-6 ${stat.color}`} />
+                <stat.icon className={`h-6 w-6 ${stat.color}`} />
               </div>
             </div>
           </div>
@@ -149,13 +176,6 @@ export function MyJobsPage() {
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Conversar
                         </button>
-                        <button
-                          onClick={() => handleCompleteJob(job.id)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Concluir
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -201,10 +221,6 @@ export function MyJobsPage() {
                       </div>
 
                       <div className="flex space-x-2 ml-4">
-                        <button className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors flex items-center">
-                          <Star className="h-4 w-4 mr-2" />
-                          Avaliar
-                        </button>
                       </div>
                     </div>
                   </div>

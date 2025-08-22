@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Briefcase, Users, Calendar, TrendingUp, Plus, Eye, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
@@ -17,6 +17,20 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
   const userProfile = state.clientProfiles.find(p => p.userId === state.currentUser?.id);
   const userDemands = state.demands.filter(d => d.clientId === state.currentUser?.id);
   const totalProfessionals = state.professionalProfiles.filter(p => p.isApproved).length;
+  
+  // 5. AJUSTE: Contar profissionais únicos interessados em demandas abertas do cliente
+  const uniqueInterestedProfessionals = useMemo(() => {
+    const activeDemands = userDemands.filter(d => d.status === 'open' || d.status === 'in_progress');
+    const allInterestedProfessionals = new Set();
+    
+    activeDemands.forEach(demand => {
+      demand.interestedProfessionals.forEach(professionalId => {
+        allInterestedProfessionals.add(professionalId);
+      });
+    });
+    
+    return allInterestedProfessionals.size;
+  }, [userDemands]);
 
   const stats = [
     {
@@ -28,7 +42,7 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
     },
     {
       label: 'Profissionais Interessados',
-      value: userDemands.reduce((acc, d) => acc + d.interestedProfessionals.length, 0),
+      value: uniqueInterestedProfessionals,
       icon: Users,
       color: 'text-green-600',
       bg: 'bg-green-100',

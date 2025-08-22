@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppState, Conversation, Message } from '../types';
+import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppState, Conversation, Message, Rating } from '../types';
 
 type AppAction = 
   | { type: 'SET_USER'; payload: User | null }
@@ -13,6 +13,9 @@ type AppAction =
   | { type: 'ADD_DEMAND'; payload: Demand }
   | { type: 'UPDATE_DEMAND'; payload: Demand }
   | { type: 'DELETE_DEMAND'; payload: string }
+  | { type: 'SELECT_PROFESSIONAL'; payload: { demandId: string; professionalId: string } }
+  | { type: 'CHANGE_PROFESSIONAL'; payload: { demandId: string; oldProfessionalId: string; newProfessionalId: string } }
+  | { type: 'COMPLETE_DEMAND'; payload: string }
   | { type: 'ADD_NOTIFICATION'; payload: Notification }
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'ADD_CONVERSATION'; payload: Conversation }
@@ -20,6 +23,7 @@ type AppAction =
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'MARK_MESSAGES_READ'; payload: { conversationId: string; userId: string } }
   | { type: 'CLEANUP_OLD_DATA'; payload: { messages: Message[]; conversations: Conversation[] } }
+  | { type: 'ADD_RATING'; payload: Rating }
   | { type: 'LOAD_DATA'; payload: Partial<AppState> };
 
 const initialState: AppState = {
@@ -31,6 +35,7 @@ const initialState: AppState = {
   notifications: [],
   conversations: [],
   messages: [],
+  ratings: [],
   isLoading: true,
 };
 
@@ -93,6 +98,33 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         demands: state.demands.filter(d => d.id !== action.payload)
       };
+    case 'SELECT_PROFESSIONAL':
+      return {
+        ...state,
+        demands: state.demands.map(d =>
+          d.id === action.payload.demandId 
+            ? { ...d, selectedProfessional: action.payload.professionalId, status: 'in_progress' as const, updatedAt: new Date() }
+            : d
+        )
+      };
+    case 'CHANGE_PROFESSIONAL':
+      return {
+        ...state,
+        demands: state.demands.map(d =>
+          d.id === action.payload.demandId 
+            ? { ...d, selectedProfessional: action.payload.newProfessionalId, updatedAt: new Date() }
+            : d
+        )
+      };
+    case 'COMPLETE_DEMAND':
+      return {
+        ...state,
+        demands: state.demands.map(d =>
+          d.id === action.payload 
+            ? { ...d, status: 'completed' as const, updatedAt: new Date() }
+            : d
+        )
+      };
     case 'ADD_NOTIFICATION':
       return { 
         ...state, 
@@ -137,6 +169,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         messages: action.payload.messages,
         conversations: action.payload.conversations,
       };
+    case 'ADD_RATING':
+      return { 
+        ...state, 
+        ratings: [...state.ratings, action.payload] 
+      };
     case 'LOAD_DATA':
       return { ...state, ...action.payload };
     default:
@@ -146,6 +183,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Reviver function to convert ISO date strings back to Date objects
+  const dateReviver = (key: string, value: any) => {
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/.test(value)) {
+      return new Date(value);
+    }
+    return value;
+  };
 
   // Inicialização única e estável
   useEffect(() => {
@@ -157,14 +202,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const usersData = localStorage.getItem('vinko-users');
         let users: User[] = [];
         if (usersData) {
-          users = JSON.parse(usersData);
+          users = JSON.parse(usersData, dateReviver);
         }
         
         // Carregar usuário atual
         const currentUserData = localStorage.getItem('vinko-current-user');
         let currentUser = null;
         if (currentUserData) {
-          currentUser = JSON.parse(currentUserData);
+          currentUser = JSON.parse(currentUserData, dateReviver);
         }
         
        // Carregar outros dados
@@ -172,7 +217,7 @@ let parsedData = {};
 try {
   const savedData = localStorage.getItem('vinko-data');
   if (savedData && savedData !== 'undefined' && isMounted) {
-    parsedData = JSON.parse(savedData);
+    parsedData = JSON.parse(savedData, dateReviver);
   }
 } catch (error) {
   console.error('Erro ao fazer parse do vinko-data:', error);
@@ -227,6 +272,7 @@ try {
         notifications: state.notifications,
         conversations: state.conversations,
         messages: state.messages,
+        ratings: state.ratings,
       };
       
       try {
@@ -240,7 +286,7 @@ try {
         console.error('Erro ao salvar dados:', error);
       }
     }
-  }, [state.users, state.currentUser, state.professionalProfiles, state.clientProfiles, state.demands, state.notifications, state.conversations, state.messages, state.isLoading]);
+  }, [state.users, state.currentUser, state.professionalProfiles, state.clientProfiles, state.demands, state.notifications, state.conversations, state.messages, state.ratings, state.isLoading]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

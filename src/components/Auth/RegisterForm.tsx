@@ -19,6 +19,7 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
     userType: '' as 'professional' | 'client' | '',
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -27,8 +28,6 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
     setErrors([]);
     setIsLoading(true);
 
-    console.log('=== DEBUG CADASTRO ===');
-    console.log('Email para cadastro:', formData.email);
 
     if (formData.password !== formData.confirmPassword) {
       setErrors(['As senhas não conferem']);
@@ -45,20 +44,14 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
     try {
       // Check if user already exists in context state
       const users = state.users;
-      console.log('Total de usuários existentes:', users.length);
-      console.log('Usuários existentes:', users.map(u => ({ email: u.email, type: u.type })));
       
       const emailToCheck = formData.email.toLowerCase().trim();
-      console.log('Email normalizado para verificação:', emailToCheck);
       
-      const userExists = users.find((u: User) => 
+      const userExists = users.find((u: UserType) => 
         u.email.toLowerCase().trim() === emailToCheck
       );
 
-      console.log('Usuário já existe:', userExists ? 'SIM' : 'NÃO');
-      
       if (userExists) {
-        console.log('Tentativa de cadastro com email existente:', userExists.email);
         setErrors(['Este email já está cadastrado']);
         setIsLoading(false);
         return;
@@ -78,15 +71,13 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
       dispatch({ type: 'ADD_USER', payload: newUser });
       dispatch({ type: 'SET_USER', payload: newUser });
       
-      console.log('Novo usuário criado:', { email: newUser.email, type: newUser.type });
-      console.log('Total de usuários após cadastro:', users.length + 1);
-      console.log('=== FIM DEBUG CADASTRO ===');
 
       // Call onRegister callback
       onRegister(newUser);
     } catch (error) {
       console.error('Erro no cadastro:', error);
       setErrors(['Erro interno. Tente novamente.']);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -234,13 +225,20 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               id="confirmPassword"
-              type="password"
+              type={showConfirmPassword ? 'text' : 'password'}
               value={formData.confirmPassword}
               onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               placeholder="Confirme sua senha"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
         </div>
 

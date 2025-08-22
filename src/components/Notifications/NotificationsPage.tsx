@@ -39,6 +39,10 @@ export function NotificationsPage() {
         return <CheckCircle className="h-5 w-5 text-green-600" />;
       case 'selected':
         return <Check className="h-5 w-5 text-purple-600" />;
+      case 'removed':
+        return <X className="h-5 w-5 text-red-600" />;
+      case 'completed':
+        return <CheckCircle className="h-5 w-5 text-blue-600" />;
       default:
         return <Bell className="h-5 w-5 text-gray-600" />;
     }

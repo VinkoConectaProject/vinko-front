@@ -7,18 +7,12 @@ import {
   Clock, 
   CheckCircle, 
   Search, 
-  Phone, 
-  Video,
-  MoreVertical,
   Trash2,
   Archive,
   AlertTriangle,
-  Calendar,
-  Filter,
   X
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { Conversation, Message } from '../../types';
 
 interface MessagesPageProps {
   selectedConversationId?: string;
@@ -27,7 +21,7 @@ interface MessagesPageProps {
 
 export function MessagesPage({ selectedConversationId, onStartConversation }: MessagesPageProps) {
   const { state, dispatch } = useApp();
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<any>(null);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'unread' | 'archived'>('all');
@@ -118,7 +112,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
 
-    const message: Message = {
+    const message = {
       id: Date.now().toString(),
       conversationId: selectedConversation.id,
       senderId: state.currentUser?.id || '',
@@ -197,7 +191,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
     return professional ? 'professional' : 'client';
   };
 
-  const getOtherParticipant = (conversation: Conversation) => {
+  const getOtherParticipant = (conversation: any) => {
     return conversation.participants && Array.isArray(conversation.participants) 
       ? conversation.participants.find(p => p !== state.currentUser?.id) || ''
       : '';
@@ -211,7 +205,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
     ).length;
   };
 
-  const getConversationAge = (conversation: Conversation) => {
+  const getConversationAge = (conversation: any) => {
     const now = new Date();
     const created = new Date(conversation.createdAt);
     const diffInDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));

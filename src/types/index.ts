@@ -71,10 +71,21 @@ export interface Demand {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'new_demand' | 'new_interest' | 'selected' | 'general';
+  type: 'new_demand' | 'new_interest' | 'selected' | 'removed' | 'completed' | 'general';
   title: string;
   message: string;
   isRead: boolean;
+  createdAt: Date;
+  demandId?: string;
+}
+
+export interface Rating {
+  id: string;
+  demandId: string;
+  clientId: string;
+  professionalId: string;
+  stars: number; // 1-5
+  comment: string;
   createdAt: Date;
 }
 
@@ -87,6 +98,7 @@ export interface AppState {
   notifications: Notification[];
   conversations: Conversation[];
   messages: Message[];
+  ratings: Rating[];
   isLoading: boolean;
 }
 

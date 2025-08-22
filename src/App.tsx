@@ -17,7 +17,6 @@ import { MyDemandsPage } from './components/Demands/MyDemandsPage';
 import { MyJobsPage } from './components/Jobs/MyJobsPage';
 import { NotificationsPage } from './components/Notifications/NotificationsPage';
 import { MessagesPage } from './components/Messages/MessagesPage';
-import { Conversation, Message } from './types';
 
 function AppContent() {
   const { state, dispatch } = useApp();
@@ -29,7 +28,6 @@ function AppContent() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [appState, setAppState] = useState<'loading' | 'landing' | 'auth' | 'dashboard'>('loading');
 
-  // ✅ Adicione essa função AQUI 👇
   const handleLogout = () => {
     dispatch({ type: 'LOGOUT' });
     setAppState('landing');
@@ -71,7 +69,7 @@ function AppContent() {
       
       // Send initial message if provided
       if (initialMessage) {
-        const message: Message = {
+        const message = {
           id: Date.now().toString(),
           conversationId: existingConversation.id,
           senderId: state.currentUser?.id || '',
@@ -94,7 +92,7 @@ function AppContent() {
     }
 
     // Create new conversation
-    const newConversation: Conversation = {
+    const newConversation = {
       id: Date.now().toString(),
       participants: [state.currentUser?.id || '', otherUserId],
       createdAt: new Date(),
@@ -106,7 +104,7 @@ function AppContent() {
     
     // Send initial message if provided
     if (initialMessage) {
-      const message: Message = {
+      const message = {
         id: (Date.now() + 1).toString(),
         conversationId: newConversation.id,
         senderId: state.currentUser?.id || '',
@@ -145,46 +143,46 @@ function AppContent() {
   }
 
   if (appState === 'landing') {
-  return (
-    <LandingPage
-      onNavigateToAuth={(mode) => {
-        setAuthMode(mode);
-        setAppState('auth');
-      }}
-    />
-  );
-}
+    return (
+      <LandingPage
+        onNavigateToAuth={(mode) => {
+          setAuthMode(mode);
+          setAppState('auth');
+        }}
+      />
+    );
+  }
 
   // Auth pages
-if (appState === 'auth') {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-pink-25 to-pink-100 py-12 px-4">
-      <div className="max-w-md mx-auto">
-        {authMode === 'login' && (
-          <LoginForm 
-  onSwitchToRegister={() => setAuthMode('register')}
-  onForgotPassword={() => setAuthMode('forgot')}
-  onBackToLanding={() => setAppState('landing')}
-  onLogin={(user) => {
-    dispatch({ type: 'SET_USER', payload: user });
-    setAppState('dashboard');
-  }}
-/>
-        )}
-        {authMode === 'register' && (
-  <RegisterForm 
-    onSwitchToLogin={() => setAuthMode('login')}
-    onBackToLanding={() => setAppState('landing')}
-    onRegister={() => setAppState('dashboard')} // <- aqui definimos o que acontece após o cadastro
-  />
-)}
-        {authMode === 'forgot' && (
-          <ForgotPasswordForm onBack={() => setAuthMode('login')} />
-        )}
+  if (appState === 'auth') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-pink-25 to-pink-100 py-12 px-4">
+        <div className="max-w-md mx-auto">
+          {authMode === 'login' && (
+            <LoginForm 
+              onSwitchToRegister={() => setAuthMode('register')}
+              onForgotPassword={() => setAuthMode('forgot')}
+              onBackToLanding={() => setAppState('landing')}
+              onLogin={(user) => {
+                dispatch({ type: 'SET_USER', payload: user });
+                setAppState('dashboard');
+              }}
+            />
+          )}
+          {authMode === 'register' && (
+            <RegisterForm 
+              onSwitchToLogin={() => setAuthMode('login')}
+              onBackToLanding={() => setAppState('landing')}
+              onRegister={() => setAppState('dashboard')}
+            />
+          )}
+          {authMode === 'forgot' && (
+            <ForgotPasswordForm onBack={() => setAuthMode('login')} />
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   // Dashboard (logged in area)
   const renderPage = () => {
@@ -282,11 +280,22 @@ if (appState === 'auth') {
         case 'settings':
           return <div className="p-6"><h1 className="text-2xl font-bold">Configurações</h1><p className="text-gray-600">Em desenvolvimento...</p></div>;
         default:
-          return <ClientDashboard onPageChange={setCurrentPage} onShowDemandForm={() => setShowDemandForm(true)} onShowDemandDetails={(id) => setSelectedDemandId(id)} onStartConversation={startConversation} />;
+          return (
+            <ClientDashboard 
+              onPageChange={setCurrentPage} 
+              onShowDemandForm={() => setShowDemandForm(true)} 
+              onShowDemandDetails={(id) => setSelectedDemandId(id)} 
+              onStartConversation={startConversation} 
+            />
+          );
       }
     }
 
-    return <div className="py-6"><h1 className="text-2xl font-bold">Página não encontrada</h1></div>;
+    return (
+      <div className="py-6">
+        <h1 className="text-2xl font-bold">Página não encontrada</h1>
+      </div>
+    );
   };
 
   const getPageTitle = () => {

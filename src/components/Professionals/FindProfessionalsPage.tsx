@@ -422,6 +422,110 @@ function ProfessionalProfileModal({ professional, onClose, onContact, onStartCon
             </span>
           </div>
 
+          {/* Ratings Section */}
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+              <Star className="h-4 w-4 mr-2 text-yellow-500" />
+              Avaliações dos Clientes
+            </h3>
+            
+            {(() => {
+              const { state } = useApp();
+              const professionalRatings = state.ratings.filter(r => r.professionalId === professional.userId);
+              const averageRating = professionalRatings.length > 0 
+                ? professionalRatings.reduce((sum, r) => sum + r.stars, 0) / professionalRatings.length 
+                : 0;
+              
+              const renderStars = (rating: number) => {
+                return Array.from({ length: 5 }, (_, index) => (
+                  <Star
+                    key={index}
+                    className={`h-4 w-4 ${
+                      index < rating
+                        ? 'text-yellow-500 fill-current'
+                        : 'text-gray-300'
+                    }`}
+                  />
+                ));
+              };
+
+              if (professionalRatings.length === 0) {
+                return (
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <Star className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">Nenhuma avaliação ainda</p>
+                    <p className="text-gray-400 text-sm">Seja o primeiro a avaliar este profissional!</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {/* Average Rating */}
+                  <div className="bg-yellow-50 rounded-lg p-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-yellow-600">
+                          {averageRating.toFixed(1)}
+                        </div>
+                        <div className="flex justify-center mt-1">
+                          {renderStars(Math.round(averageRating))}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-gray-900 font-medium">Média das Avaliações</p>
+                        <p className="text-gray-600 text-sm">
+                          {professionalRatings.length} avaliação{professionalRatings.length !== 1 ? 'ões' : ''} recebida{professionalRatings.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Individual Ratings */}
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {professionalRatings
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((rating) => {
+                        const client = state.clientProfiles.find(c => c.userId === rating.clientId);
+                        const clientName = client?.name || 'Cliente';
+                        
+                        return (
+                          <div key={rating.id} className="border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <User className="h-3 w-3 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900 text-sm">{clientName}</p>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex">
+                                      {renderStars(rating.stars)}
+                                    </div>
+                                    <span className="text-xs text-gray-600">
+                                      {rating.stars} estrela{rating.stars !== 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {new Date(rating.createdAt).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                            {rating.comment && (
+                              <p className="text-gray-600 text-sm mt-2 pl-8">
+                                "{rating.comment}"
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Contato</h3>
             <div className="space-y-2 text-sm text-gray-600">

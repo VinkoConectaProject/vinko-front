@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { Search, Filter, MapPin, Clock, DollarSign, User, MessageCircle, Heart, Eye, X, Phone, ChevronLeft, ChevronRight, Image } from 'lucide-react';
-import { Demand, Conversation, Message } from '../../types';
+import { Demand } from '../../types';
 
 interface OpportunitiesPageProps {
   onStartConversation?: (otherUserId: string, demandId?: string, initialMessage?: string) => void;
@@ -10,61 +10,11 @@ interface OpportunitiesPageProps {
 export default function OpportunitiesPage({ onStartConversation }: OpportunitiesPageProps) {
   const { state, dispatch } = useApp();
   const { demands, currentUser } = state;
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedBudget, setSelectedBudget] = useState('');
   const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
-
-  const showInterest = (demandId: string, professionalId: string) => {
-    const demand = demands.find(d => d.id === demandId);
-    if (demand) {
-      const updatedDemand = {
-        ...demand,
-        interestedProfessionals: [...(demand.interestedProfessionals || []), professionalId]
-      };
-      dispatch({ type: 'UPDATE_DEMAND', payload: updatedDemand });
-      
-      // Add notification
-      const notification = {
-        id: Date.now().toString(),
-        userId: demand.clientId,
-        type: 'interest' as const,
-        title: 'Novo interesse na sua demanda',
-        message: `Um profissional demonstrou interesse na demanda: ${demand.title}`,
-        isRead: false,
-        createdAt: new Date().toISOString()
-      };
-      dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-    }
-  };
-
-  const startConversation = (clientId: string, professionalId: string, initialMessage: string) => {
-    const conversationId = `${clientId}-${professionalId}`;
-    const existingConversation = state.conversations.find(c => c.id === conversationId);
-    
-    if (!existingConversation) {
-      const newConversation = {
-        id: conversationId,
-        clientId,
-        professionalId,
-        lastMessage: initialMessage,
-        lastMessageTime: new Date().toISOString(),
-        unreadCount: 1
-      };
-      dispatch({ type: 'ADD_CONVERSATION', payload: newConversation });
-    }
-    
-    const message = {
-      id: Date.now().toString(),
-      conversationId,
-      senderId: professionalId,
-      content: initialMessage,
-      timestamp: new Date().toISOString(),
-      isRead: false
-    };
-    dispatch({ type: 'ADD_MESSAGE', payload: message });
-  };
+  const [searchTerm, setSearchTerm] = useState('');
 
   const serviceTypes = [
     'Design Gráfico',
@@ -114,68 +64,9 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
     };
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
 
-    alert('Mensagem enviada! O cliente receberá uma notificação.');
   };
 
-  const handleStartConversationInternal = (demand: Demand) => {
-    if (!state.currentUser) return;
-
-    const conversationId = `${state.currentUser.id}-${demand.clientId}`;
-    const existingConversation = state.conversations.find(c => c.id === conversationId);
-
-    if (!existingConversation) {
-      const newConversation: Conversation = {
-        id: conversationId,
-        participants: [state.currentUser.id, demand.clientId],
-        lastMessage: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        demandId: demand.id,
-      };
-      dispatch({ type: 'ADD_CONVERSATION', payload: newConversation });
-    }
-
-    // Create initial message
-    const message: Message = {
-      id: Date.now().toString(),
-      conversationId,
-      senderId: state.currentUser.id,
-      content: `Olá! Tenho interesse na sua demanda: "${demand.title}". Gostaria de conversar sobre os detalhes do projeto.`,
-      timestamp: new Date(),
-      isRead: false,
-      type: 'text',
-    };
-
-    dispatch({ type: 'ADD_MESSAGE', payload: message });
-
-    // Update conversation with last message
-    const updatedConversation: Conversation = {
-      id: conversationId,
-      participants: [state.currentUser.id, demand.clientId],
-      lastMessage: message,
-      createdAt: existingConversation?.createdAt || new Date(),
-      updatedAt: new Date(),
-      demandId: demand.id,
-    };
-    dispatch({ type: 'UPDATE_CONVERSATION', payload: updatedConversation });
-
-    // Send notification to client
-    const professional = state.professionalProfiles.find(p => p.userId === state.currentUser!.id);
-    const notification = {
-      id: Date.now().toString(),
-      userId: demand.clientId,
-      type: 'new_message' as const,
-      title: 'Nova mensagem',
-      message: `${professional?.name || 'Um profissional'} enviou uma mensagem sobre sua demanda: ${demand.title}`,
-      isRead: false,
-      createdAt: new Date(),
-    };
-    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-
-    alert('Mensagem enviada! O cliente receberá uma notificação.');
-  };
-
-  const filteredDemands = demands.filter(demand => {
+  const filteredDemands = state.demands.filter(demand => {
     const matchesSearch = demand.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          demand.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesService = !selectedService || demand.serviceType === selectedService;
@@ -187,26 +78,36 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
   });
 
   const handleShowInterest = (demandId: string) => {
-    if (currentUser) {
-      showInterest(demandId, currentUser.id);
-      // Iniciar conversa automaticamente
-      const demand = demands.find(d => d.id === demandId);
+    if (state.currentUser) {
+      const demand = state.demands.find(d => d.id === demandId);
       if (demand) {
-        startConversation(demand.clientId, currentUser.id, `Olá! Tenho interesse na sua demanda: ${demand.title}`);
+        // Add professional to interested list
+        const updatedDemand = {
+          ...demand,
+          interestedProfessionals: [...demand.interestedProfessionals, state.currentUser.id]
+        };
+        dispatch({ type: 'UPDATE_DEMAND', payload: updatedDemand });
+        
+        // Send notification to client
+        const professional = state.professionalProfiles.find(p => p.userId === state.currentUser.id);
+        const notification = {
+          id: Date.now().toString(),
+          userId: demand.clientId,
+          type: 'new_interest' as const,
+          title: 'Novo interesse na sua demanda',
+          message: `${professional?.name || 'Um profissional'} demonstrou interesse na demanda: ${demand.title}`,
+          isRead: false,
+          createdAt: new Date(),
+          demandId: demand.id,
+        };
+        dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
       }
     }
   };
 
-  const handleStartConversation = (demandId: string) => {
-    const demand = demands.find(d => d.id === demandId);
-    if (demand && currentUser) {
-      startConversation(demand.clientId, currentUser.id, `Olá! Gostaria de conversar sobre a demanda: ${demand.title}`);
-    }
-  };
-
   const isInterestedInDemand = (demandId: string) => {
-    const demand = demands.find(d => d.id === demandId);
-    return demand?.interestedProfessionals?.includes(currentUser?.id || '') || false;
+    const demand = state.demands.find(d => d.id === demandId);
+    return demand?.interestedProfessionals?.includes(state.currentUser?.id || '') || false;
   };
 
   return (
@@ -713,7 +614,6 @@ function ImageWithFallback({ src, alt, className, onClick }: ImageWithFallbackPr
   };
 
   const handleClick = () => {
-    console.log('ImageWithFallback clicada:', src);
     if (onClick) {
       onClick();
     }

@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { RegisterForm } from './components/Auth/RegisterForm';
 import { ForgotPasswordForm } from './components/Auth/ForgotPasswordForm';
+import { EmailVerification } from './components/Auth/EmailVerification';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { ProfessionalDashboard } from './components/Dashboard/ProfessionalDashboard';
@@ -17,6 +18,7 @@ import { MyDemandsPage } from './components/Demands/MyDemandsPage';
 import { MyJobsPage } from './components/Jobs/MyJobsPage';
 import { NotificationsPage } from './components/Notifications/NotificationsPage';
 import { MessagesPage } from './components/Messages/MessagesPage';
+import { DjangoUser } from './types';
 
 function AppContent() {
   const { state, dispatch } = useApp();
@@ -26,7 +28,8 @@ function AppContent() {
   const [showDemandForm, setShowDemandForm] = useState(false);
   const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [appState, setAppState] = useState<'loading' | 'landing' | 'auth' | 'dashboard'>('loading');
+  const [appState, setAppState] = useState<'loading' | 'landing' | 'auth' | 'emailVerification' | 'dashboard'>('loading');
+  const [verificationEmail, setVerificationEmail] = useState<string>('');
 
   const handleLogout = () => {
     dispatch({ type: 'LOGOUT' });
@@ -45,7 +48,7 @@ function AppContent() {
     const urlParams = new URLSearchParams(window.location.search);
     const authParam = urlParams.get('auth');
 
-    if (state.currentUser) {
+    if (state.currentUser || state.djangoUser) {
       setAppState('dashboard');
     } else if (authParam) {
       setAppState('auth');
@@ -53,7 +56,26 @@ function AppContent() {
     } else {
       setAppState('landing');
     }
-  }, [state.isLoading, state.currentUser]);
+  }, [state.isLoading, state.currentUser, state.djangoUser]);
+
+  const handleShowEmailVerification = (email: string) => {
+    setVerificationEmail(email);
+    setAppState('emailVerification');
+  };
+
+  const handleEmailVerificationSuccess = (authData: { user: DjangoUser; token: { access: string; refresh: string } }) => {
+    dispatch({ type: 'SET_DJANGO_USER', payload: authData.user });
+    setAppState('dashboard');
+  };
+
+  const handleBackToAuth = () => {
+    setAppState('auth');
+  };
+
+  const handleGoToLogin = () => {
+    setAuthMode('login');
+    setAppState('auth');
+  };
 
   const startConversation = (otherUserId: string, demandId?: string, initialMessage?: string) => {
     // Check if conversation already exists
@@ -76,7 +98,7 @@ function AppContent() {
           content: initialMessage,
           timestamp: new Date(),
           isRead: false,
-          type: 'text',
+          type: 'text' as const,
         };
         dispatch({ type: 'ADD_MESSAGE', payload: message });
         
@@ -105,13 +127,13 @@ function AppContent() {
     // Send initial message if provided
     if (initialMessage) {
       const message = {
-        id: (Date.now() + 1).toString(),
+        id: Date.now().toString(),
         conversationId: newConversation.id,
         senderId: state.currentUser?.id || '',
         content: initialMessage,
         timestamp: new Date(),
         isRead: false,
-        type: 'text',
+        type: 'text' as const,
       };
       dispatch({ type: 'ADD_MESSAGE', payload: message });
       
@@ -167,13 +189,14 @@ function AppContent() {
                 dispatch({ type: 'SET_USER', payload: user });
                 setAppState('dashboard');
               }}
+              onShowEmailVerification={handleShowEmailVerification}
             />
           )}
           {authMode === 'register' && (
             <RegisterForm 
               onSwitchToLogin={() => setAuthMode('login')}
               onBackToLanding={() => setAppState('landing')}
-              onRegister={() => setAppState('dashboard')}
+              onShowEmailVerification={handleShowEmailVerification}
             />
           )}
           {authMode === 'forgot' && (
@@ -181,6 +204,18 @@ function AppContent() {
           )}
         </div>
       </div>
+    );
+  }
+
+  // Email Verification
+  if (appState === 'emailVerification') {
+    return (
+      <EmailVerification
+        email={verificationEmail}
+        onVerificationSuccess={handleEmailVerificationSuccess}
+        onBack={handleBackToAuth}
+        onGoToLogin={handleGoToLogin}
+      />
     );
   }
 
@@ -207,7 +242,7 @@ function AppContent() {
           return (
             <ProfessionalDashboard 
               onPageChange={setCurrentPage}
-              onShowOpportunityDetails={(demand) => {
+              onShowOpportunityDetails={() => {
                 setCurrentPage('opportunities');
               }}
             />
@@ -223,7 +258,7 @@ function AppContent() {
         case 'messages':
           return (
             <MessagesPage 
-              selectedConversationId={selectedConversationId}
+              selectedConversationId={selectedConversationId || undefined}
               onStartConversation={startConversation}
             />
           );
@@ -273,7 +308,7 @@ function AppContent() {
         case 'messages':
           return (
             <MessagesPage 
-              selectedConversationId={selectedConversationId}
+              selectedConversationId={selectedConversationId || undefined}
               onStartConversation={startConversation}
             />
           );

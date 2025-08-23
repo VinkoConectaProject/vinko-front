@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { User } from '../../types';
+import { authService } from '../../services/authService';
+import { MessageBox } from '../UI/MessageBox';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
   onForgotPassword: () => void;
   onLogin: (user: any) => void;
   onBackToLanding: () => void;
+  onShowEmailVerification: (email: string) => void;
 }
 
-export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBackToLanding }: LoginFormProps) {
-  const { state, dispatch } = useApp();
+export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBackToLanding, onShowEmailVerification }: LoginFormProps) {
+  const { dispatch } = useApp();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -20,41 +22,51 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
     setIsLoading(true);
 
-
     try {
-      // Find user in context state
-      const users = state.users;
-      
-      const emailToSearch = formData.email.toLowerCase().trim();
-      
-      const user = users.find((u: User) => 
-        u.email.toLowerCase().trim() === emailToSearch && 
-        u.password === formData.password
-      );
+      // Fazer login via API
+      const authData = await authService.login({
+        email: formData.email.toLowerCase().trim(),
+        password: formData.password,
+      });
 
-      const userByEmail = users.find((u: User) => 
-        u.email.toLowerCase().trim() === emailToSearch
-      );
-      
-
-      if (user) {
-        dispatch({ type: 'SET_USER', payload: user });
-        onLogin(user);
-      } else {
-        if (userByEmail) {
-          setErrors(['Senha incorreta']);
-        } else {
-          setErrors(['Email não cadastrado']);
-        }
+      // Verificar se o email foi verificado
+      if (!authData.user.is_email_verified) {
+        // Se não foi verificado, mostrar tela de verificação
+        onShowEmailVerification(formData.email.toLowerCase().trim());
+        return;
       }
-    } catch (error) {
+
+      // Salvar tokens
+      authService.saveTokens(authData.token.access, authData.token.refresh);
+      
+      // Atualizar contexto com o usuário Django
+      dispatch({ type: 'SET_DJANGO_USER', payload: authData.user });
+      
+      // Fazer login
+      onLogin(authData.user);
+
+    } catch (error: unknown) {
       console.error('Erro no login:', error);
-      setErrors(['Erro interno. Tente novamente.']);
+      
+      let errorMessage = 'Erro interno. Tente novamente.';
+      
+      if (error instanceof Error) {
+        // Verificar se é o erro específico de email não verificado
+        if (error.message.includes('não verificado') || error.message.includes('verificado')) {
+          // Redirecionar para verificação de email
+          onShowEmailVerification(formData.email.toLowerCase().trim());
+          return;
+        }
+        
+        errorMessage = error.message;
+      }
+      
+      setErrors([errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -72,9 +84,14 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {errors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mb-6">
             {errors.map((error, index) => (
-              <p key={index} className="text-red-700 text-sm">{error}</p>
+              <MessageBox
+                key={index}
+                type="error"
+                message={error}
+                className="mb-3"
+              />
             ))}
           </div>
         )}

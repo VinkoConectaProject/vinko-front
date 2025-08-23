@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppState, Conversation, Message, Rating } from '../types';
+import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppState, Conversation, Message, Rating, DjangoUser, AuthResponse } from '../types';
 
 type AppAction = 
   | { type: 'SET_USER'; payload: User | null }
+  | { type: 'SET_DJANGO_USER'; payload: DjangoUser | null }
   | { type: 'ADD_USER'; payload: User }
   | { type: 'SET_USERS'; payload: User[] }
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_AUTH_LOADING'; payload: boolean }
+  | { type: 'SET_AUTH_ERROR'; payload: string | null }
   | { type: 'ADD_PROFESSIONAL_PROFILE'; payload: ProfessionalProfile }
   | { type: 'ADD_CLIENT_PROFILE'; payload: ClientProfile }
   | { type: 'UPDATE_PROFESSIONAL_PROFILE'; payload: ProfessionalProfile }
@@ -24,10 +27,12 @@ type AppAction =
   | { type: 'MARK_MESSAGES_READ'; payload: { conversationId: string; userId: string } }
   | { type: 'CLEANUP_OLD_DATA'; payload: { messages: Message[]; conversations: Conversation[] } }
   | { type: 'ADD_RATING'; payload: Rating }
-  | { type: 'LOAD_DATA'; payload: Partial<AppState> };
+  | { type: 'LOAD_DATA'; payload: Partial<AppState> }
+  | { type: 'LOGOUT' };
 
 const initialState: AppState = {
   currentUser: null,
+  djangoUser: null,
   users: [],
   professionalProfiles: [],
   clientProfiles: [],
@@ -37,6 +42,8 @@ const initialState: AppState = {
   messages: [],
   ratings: [],
   isLoading: true,
+  authLoading: false,
+  authError: null,
 };
 
 const AppContext = createContext<{
@@ -173,6 +180,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { 
         ...state, 
         ratings: [...state.ratings, action.payload] 
+      };
+    case 'SET_DJANGO_USER':
+      return { ...state, djangoUser: action.payload };
+    case 'SET_AUTH_LOADING':
+      return { ...state, authLoading: action.payload };
+    case 'SET_AUTH_ERROR':
+      return { ...state, authError: action.payload };
+    case 'LOGOUT':
+      return { 
+        ...state, 
+        currentUser: null, 
+        djangoUser: null,
+        authError: null 
       };
     case 'LOAD_DATA':
       return { ...state, ...action.payload };

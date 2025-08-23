@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Eye, EyeOff, User, Building } from 'lucide-react';
-import { useApp } from '../../contexts/AppContext';
-import { User as UserType } from '../../types';
+import { UserType as DjangoUserType } from '../../types';
+import { authService } from '../../services/authService';
+import { MessageBox } from '../UI/MessageBox';
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
-  onRegister: (user: any) => void;
   onBackToLanding: () => void;
+  onShowEmailVerification: (email: string) => void;
 }
 
-export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: RegisterFormProps) {
-  const { state, dispatch } = useApp();
+export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVerification }: RegisterFormProps) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     email: '',
@@ -22,12 +22,26 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userTypes, setUserTypes] = useState<DjangoUserType[]>([]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Carregar tipos de usuário da API
+  useEffect(() => {
+    const loadUserTypes = async () => {
+      try {
+        const types = await authService.getUserTypes();
+        setUserTypes(types);
+      } catch (error) {
+        console.error('Erro ao carregar tipos de usuário:', error);
+      }
+    };
+
+    loadUserTypes();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
     setIsLoading(true);
-
 
     if (formData.password !== formData.confirmPassword) {
       setErrors(['As senhas não conferem']);
@@ -42,41 +56,40 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
     }
 
     try {
-      // Check if user already exists in context state
-      const users = state.users;
+      // Mapear os tipos do frontend para os nomes da API
+      const typeMapping: Record<string, string> = {
+        'professional': 'profissional',
+        'client': 'cliente'
+      };
+
+      const apiTypeName = typeMapping[formData.userType];
       
-      const emailToCheck = formData.email.toLowerCase().trim();
-      
-      const userExists = users.find((u: UserType) => 
-        u.email.toLowerCase().trim() === emailToCheck
+      // Encontrar o user_type_id baseado no tipo mapeado
+      const selectedUserType = userTypes.find(type => 
+        type.name.toLowerCase() === apiTypeName.toLowerCase()
       );
 
-      if (userExists) {
-        setErrors(['Este email já está cadastrado']);
+      if (!selectedUserType) {
+        setErrors(['Tipo de usuário não encontrado']);
         setIsLoading(false);
         return;
       }
 
-      // Create new user
-      const newUser: UserType = {
-        id: Date.now().toString(),
+      // Registrar usuário via API
+      await authService.register({
         email: formData.email.toLowerCase(),
         password: formData.password,
-        type: formData.userType,
-        createdAt: new Date(),
-        isActive: true,
-      };
+        password2: formData.confirmPassword,
+        user_type_id: selectedUserType.id,
+      });
 
-      // Add user to context state
-      dispatch({ type: 'ADD_USER', payload: newUser });
-      dispatch({ type: 'SET_USER', payload: newUser });
-      
+      // Mostrar tela de verificação de email
+      onShowEmailVerification(formData.email.toLowerCase());
 
-      // Call onRegister callback
-      onRegister(newUser);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro no cadastro:', error);
-      setErrors(['Erro interno. Tente novamente.']);
+      const errorMessage = error instanceof Error ? error.message : 'Erro interno. Tente novamente.';
+      setErrors([errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -166,10 +179,16 @@ export function RegisterForm({ onSwitchToLogin, onRegister, onBackToLanding }: R
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Mensagens de erro */}
         {errors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mb-6">
             {errors.map((error, index) => (
-              <p key={index} className="text-red-700 text-sm">{error}</p>
+              <MessageBox
+                key={index}
+                type="error"
+                message={error}
+                className="mb-3"
+              />
             ))}
           </div>
         )}

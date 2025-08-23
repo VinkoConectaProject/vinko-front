@@ -7,6 +7,88 @@ export interface User {
   isActive: boolean;
 }
 
+// Novos tipos para a API Django REST
+export interface DjangoUser {
+  id: number;
+  password: string;
+  last_login: string | null;
+  is_superuser: boolean;
+  username: string;
+  first_name: string;
+  last_name: string;
+  is_staff: boolean;
+  is_active: boolean;
+  date_joined: string;
+  created_at: string;
+  updated_at: string;
+  email: string;
+  is_email_verified: boolean;
+  birth_date: string | null;
+  telephone: string | null;
+  cellphone: string | null;
+  business_email: string | null;
+  postal_code: string | null;
+  city: string | null;
+  uf: string | null;
+  neighborhood: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  company_size: string | null;
+  cnpj: string | null;
+  cpf: string | null;
+  corporate_name: string | null;
+  trade_name: string | null;
+  professional_description: string | null;
+  user_type: number;
+  professional_experience: string | null;
+  specialty: string | null;
+  availability: string | null;
+  groups: any[];
+  user_permissions: any[];
+  offered_services: any[];
+}
+
+export interface JWTToken {
+  refresh: string;
+  access: string;
+}
+
+export interface AuthResponse {
+  user: DjangoUser;
+  token: JWTToken;
+}
+
+export interface UserType {
+  id: number;
+  name: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  password2: string;
+  user_type_id: number;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface EmailVerificationRequest {
+  email: string;
+  code: string;
+}
+
+export interface ResendCodeRequest {
+  email: string;
+}
+
+export interface RegisterResponse {
+  message: string;
+}
+
 export interface ProfessionalProfile {
   id: string;
   userId: string;
@@ -91,6 +173,7 @@ export interface Rating {
 
 export interface AppState {
   currentUser: User | null;
+  djangoUser: DjangoUser | null;
   users: User[];
   professionalProfiles: ProfessionalProfile[];
   clientProfiles: ClientProfile[];
@@ -100,6 +183,8 @@ export interface AppState {
   messages: Message[];
   ratings: Rating[];
   isLoading: boolean;
+  authLoading: boolean;
+  authError: string | null;
 }
 
 export interface Conversation {

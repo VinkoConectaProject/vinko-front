@@ -34,13 +34,6 @@ function AppContent() {
   const [verificationEmail, setVerificationEmail] = useState<string>('');
   const [resetPasswordCode, setResetPasswordCode] = useState<string>('');
 
-  const handleLogout = () => {
-    dispatch({ type: 'LOGOUT' });
-    setAppState('landing');
-    setCurrentPage('dashboard');
-    localStorage.clear();
-  };
-
   // Determine app state based on URL and user status
   useEffect(() => {
     if (state.isLoading) {
@@ -402,7 +395,6 @@ function AppContent() {
         onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         currentPage={getPageTitle()}
         onPageChange={setCurrentPage}
-        onLogout={handleLogout}
       />
       
       <div className="flex min-h-screen">

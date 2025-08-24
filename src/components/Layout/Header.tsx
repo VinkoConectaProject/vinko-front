@@ -1,16 +1,16 @@
 import React from 'react';
-import { Bell, User, LogOut, Search, Menu } from 'lucide-react';
+import { Bell, User, Search, Menu } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { LogoutButton } from '../UI/LogoutButton';
 
 interface HeaderProps {
   onMenuToggle: () => void;
   currentPage: string;
   onPageChange: (page: string) => void;
-  onLogout: () => void;
 }
 
-export function Header({ onMenuToggle, currentPage, onPageChange, onLogout }: HeaderProps) {
-  const { state, dispatch } = useApp();
+export function Header({ onMenuToggle, currentPage, onPageChange }: HeaderProps) {
+  const { state } = useApp();
   const unreadNotifications = state.notifications.filter(n => !n.isRead).length;
 
   const handleNotificationClick = () => {
@@ -79,12 +79,7 @@ export function Header({ onMenuToggle, currentPage, onPageChange, onLogout }: He
                 >
                   <User className="h-5 w-5 text-gray-600" />
                 </button>
-                <button 
-                  onClick={onLogout}
-                  className="p-2 rounded-lg hover:bg-pink-50 transition-colors"
-                >
-                  <LogOut className="h-5 w-5 text-gray-600" />
-                </button>
+                <LogoutButton variant="minimal" />
               </div>
             </div>
           </div>

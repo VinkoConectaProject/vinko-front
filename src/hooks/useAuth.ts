@@ -1,10 +1,11 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { authService } from '../services/authService';
 import { DjangoUser } from '../types';
 
 export const useAuth = () => {
   const { state, dispatch } = useApp();
+  const tokenCheckInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Verificar se o usuário está autenticado ao carregar a aplicação
   useEffect(() => {
@@ -44,6 +45,40 @@ export const useAuth = () => {
 
     checkAuth();
   }, []);
+
+  // Configurar verificação periódica de tokens
+  useEffect(() => {
+    if (authService.isAuthenticated()) {
+      // Verificar a cada 5 minutos
+      tokenCheckInterval.current = setInterval(() => {
+        const checkTokenExpiry = async () => {
+          if (authService.isTokenExpired()) {
+            const refreshToken = authService.getRefreshToken();
+            if (refreshToken) {
+              try {
+                const { access } = await authService.refreshToken(refreshToken);
+                authService.saveTokens(access, refreshToken);
+                console.log('Token renovado automaticamente');
+              } catch (error) {
+                console.error('Falha ao renovar token:', error);
+                logout();
+              }
+            } else {
+              logout();
+            }
+          }
+        };
+
+        checkTokenExpiry();
+      }, 5 * 60 * 1000); // 5 minutos
+    }
+
+    return () => {
+      if (tokenCheckInterval.current) {
+        clearInterval(tokenCheckInterval.current);
+      }
+    };
+  }, [state.djangoUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     dispatch({ type: 'SET_AUTH_LOADING', payload: true });
@@ -154,8 +189,17 @@ export const useAuth = () => {
   }, [dispatch]);
 
   const logout = useCallback(() => {
-    authService.clearTokens();
+    // Limpar intervalo de verificação
+    if (tokenCheckInterval.current) {
+      clearInterval(tokenCheckInterval.current);
+      tokenCheckInterval.current = null;
+    }
+    
+    // Fazer logout no contexto
     dispatch({ type: 'LOGOUT' });
+    
+    // Fazer logout no serviço (que limpa localStorage e redireciona)
+    authService.logout();
   }, [dispatch]);
 
   const isAuthenticated = useCallback(() => {

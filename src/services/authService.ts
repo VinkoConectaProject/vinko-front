@@ -161,6 +161,22 @@ class AuthService extends BaseApiService {
     localStorage.removeItem('vinko_access_expiry');
   }
 
+  // Logout completo - limpa todos os dados de autenticação
+  logout(): void {
+    this.clearTokens();
+    
+    // Limpar dados específicos do Vinko
+    localStorage.removeItem('vinko-current-user');
+    localStorage.removeItem('vinko-users');
+    localStorage.removeItem('vinko-data');
+    
+    // Limpar dados de sessão
+    sessionStorage.clear();
+    
+    // Redirecionar para a página inicial
+    window.location.href = '/';
+  }
+
   // Verificar se o usuário está autenticado
   isAuthenticated(): boolean {
     const token = this.getAccessToken();

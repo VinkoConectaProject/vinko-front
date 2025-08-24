@@ -189,9 +189,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, authError: action.payload };
     case 'LOGOUT':
       return { 
-        ...state, 
-        currentUser: null, 
-        djangoUser: null,
+        ...initialState,
+        isLoading: false,
+        authLoading: false,
         authError: null 
       };
     case 'LOAD_DATA':

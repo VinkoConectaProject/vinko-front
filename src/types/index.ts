@@ -114,6 +114,10 @@ export interface PasswordResetConfirmRequest {
   password2: string;
 }
 
+export interface PasswordResetValidateRequest {
+  code: string;
+}
+
 export interface RegisterResponse {
   message: string;
 }

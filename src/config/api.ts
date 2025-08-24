@@ -9,6 +9,7 @@ export const API_CONFIG = {
       RESEND_CODE: '/user/email-verification-codes/resend/',
       PASSWORD_RESET: '/user/password-reset/',
       PASSWORD_RESET_CONFIRM: '/user/password-reset-confirm/',
+      PASSWORD_RESET_VALIDATE: '/user/password-reset-validate/',
     },
     USER: {
       USER_TYPES: '/user/user-types/',

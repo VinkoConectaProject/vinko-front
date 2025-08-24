@@ -20,6 +20,7 @@ import { MyJobsPage } from './components/Jobs/MyJobsPage';
 import { NotificationsPage } from './components/Notifications/NotificationsPage';
 import { MessagesPage } from './components/Messages/MessagesPage';
 import { DjangoUser } from './types';
+import { authService } from './services/authService';
 
 function AppContent() {
   const { state, dispatch } = useApp();
@@ -54,8 +55,8 @@ function AppContent() {
     if (state.currentUser || state.djangoUser) {
       setAppState('dashboard');
     } else if (codeParam) {
-      setResetPasswordCode(codeParam);
-      setAppState('resetPassword');
+      // Validar o código antes de mostrar a página de redefinir senha
+      validateResetPasswordCode(codeParam);
     } else if (authParam) {
       setAppState('auth');
       setAuthMode(authParam === 'register' ? 'register' : authParam === 'forgot' ? 'forgot' : 'login');
@@ -63,6 +64,22 @@ function AppContent() {
       setAppState('landing');
     }
   }, [state.isLoading, state.currentUser, state.djangoUser]);
+
+  // Função para validar o código de redefinição de senha
+  const validateResetPasswordCode = async (code: string) => {
+    try {
+      await authService.validatePasswordResetCode({ code });
+      // Código válido, mostrar página de redefinir senha
+      setResetPasswordCode(code);
+      setAppState('resetPassword');
+    } catch (error: unknown) {
+      // Código inválido, redirecionar para página de esqueci a senha
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Código de redefinição inválido:', errorMessage);
+      setAppState('auth');
+      setAuthMode('forgot');
+    }
+  };
 
   const handleShowEmailVerification = (email: string) => {
     setVerificationEmail(email);

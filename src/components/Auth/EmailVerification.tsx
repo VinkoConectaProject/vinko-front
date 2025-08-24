@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { authService } from '../../services/authService';
 import { AuthResponse } from '../../types';
-import { MessageBox } from '../UI/MessageBox';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import { ApiMessage } from '../UI/ApiMessage';
+import { ERROR_MESSAGES } from '../../config/errorMessages';
 
 interface EmailVerificationProps {
   email: string;
@@ -16,10 +18,9 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
   onBack,
   onGoToLogin,
 }) => {
+  const { apiMessage, handleApiError, handleApiSuccess, hideMessage } = useApiMessage();
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
   const [resendCountdown, setResendCountdown] = useState(0);
 
   useEffect(() => {
@@ -31,13 +32,11 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
 
   const handleVerifyCode = async () => {
     if (!code.trim()) {
-      setMessage('Por favor, insira o código de verificação.');
-      setMessageType('error');
+      handleApiError(ERROR_MESSAGES.INVALID_CODE);
       return;
     }
 
     setIsLoading(true);
-    setMessage('');
 
     try {
       const authData = await authService.verifyEmail({
@@ -45,8 +44,8 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         code: code.trim(),
       });
 
-      setMessage('Código verificado com sucesso!');
-      setMessageType('success');
+      // Mostrar mensagem de sucesso
+      handleApiSuccess(authData.message);
       
       // Salvar tokens
       authService.saveTokens(authData.token.access, authData.token.refresh);
@@ -57,8 +56,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
       }, 1500);
 
     } catch (error: any) {
-      setMessage(error.message || 'Erro ao verificar o código. Tente novamente.');
-      setMessageType('error');
+      handleApiError(error);
     } finally {
       setIsLoading(false);
     }
@@ -66,16 +64,13 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
 
   const handleResendCode = async () => {
     setIsLoading(true);
-    setMessage('');
 
     try {
-      await authService.resendVerificationCode({ email });
-      setMessage('Código reenviado com sucesso! Verifique seu e-mail.');
-      setMessageType('success');
+      const result = await authService.resendVerificationCode({ email });
+      handleApiSuccess(result.message);
       setResendCountdown(60); // 60 segundos de espera
     } catch (error: any) {
-      setMessage(error.message || 'Erro ao reenviar o código. Tente novamente.');
-      setMessageType('error');
+      handleApiError(error);
     } finally {
       setIsLoading(false);
     }
@@ -125,11 +120,12 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         </div>
 
         {/* Mensagem */}
-        {message && (
-          <MessageBox
-            type={messageType === 'success' ? 'success' : 'error'}
-            message={message}
-            className="mb-6"
+        {apiMessage.show && (
+          <ApiMessage
+            message={apiMessage.message}
+            type={apiMessage.type}
+            show={apiMessage.show}
+            onClose={hideMessage}
           />
         )}
 

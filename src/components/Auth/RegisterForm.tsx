@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Eye, EyeOff, User, Building } from 'lucide-react';
 import { UserType as DjangoUserType } from '../../types';
 import { authService } from '../../services/authService';
-import { MessageBox } from '../UI/MessageBox';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import { ApiMessage } from '../UI/ApiMessage';
+import { ERROR_MESSAGES } from '../../config/errorMessages';
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -11,6 +13,7 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVerification }: RegisterFormProps) {
+  const { apiMessage, handleApiError, handleApiSuccess, hideMessage } = useApiMessage();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     email: '',
@@ -20,7 +23,6 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userTypes, setUserTypes] = useState<DjangoUserType[]>([]);
 
@@ -32,25 +34,25 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
         setUserTypes(types);
       } catch (error) {
         console.error('Erro ao carregar tipos de usuário:', error);
+        handleApiError(error);
       }
     };
 
     loadUserTypes();
-  }, []);
+  }, [handleApiError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrors([]);
     setIsLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
-      setErrors(['As senhas não conferem']);
+      handleApiError(ERROR_MESSAGES.PASSWORDS_DONT_MATCH);
       setIsLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
-      setErrors(['A senha deve ter pelo menos 6 caracteres']);
+      handleApiError(ERROR_MESSAGES.PASSWORD_TOO_SHORT);
       setIsLoading(false);
       return;
     }
@@ -70,26 +72,28 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
       );
 
       if (!selectedUserType) {
-        setErrors(['Tipo de usuário não encontrado']);
+        handleApiError(ERROR_MESSAGES.BAD_REQUEST);
         setIsLoading(false);
         return;
       }
 
       // Registrar usuário via API
-      await authService.register({
+      const result = await authService.register({
         email: formData.email.toLowerCase(),
         password: formData.password,
         password2: formData.confirmPassword,
         user_type_id: selectedUserType.id,
       });
 
+      // Mostrar mensagem de sucesso
+      handleApiSuccess(result.message);
+
       // Mostrar tela de verificação de email
       onShowEmailVerification(formData.email.toLowerCase());
 
     } catch (error: unknown) {
       console.error('Erro no cadastro:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro interno. Tente novamente.';
-      setErrors([errorMessage]);
+      handleApiError(error);
     } finally {
       setIsLoading(false);
     }
@@ -180,16 +184,14 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Mensagens de erro */}
-        {errors.length > 0 && (
+        {apiMessage.show && (
           <div className="mb-6">
-            {errors.map((error, index) => (
-              <MessageBox
-                key={index}
-                type="error"
-                message={error}
-                className="mb-3"
-              />
-            ))}
+            <ApiMessage
+              message={apiMessage.message}
+              type={apiMessage.type}
+              show={apiMessage.show}
+              onClose={hideMessage}
+            />
           </div>
         )}
 

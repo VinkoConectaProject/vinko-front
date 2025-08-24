@@ -7,6 +7,21 @@ export interface User {
   isActive: boolean;
 }
 
+// Tipos genéricos para respostas da API
+export interface ApiResponse<T = any> {
+  status: 'success' | 'error';
+  message: string;
+  error: string;
+  data: T;
+}
+
+export interface ApiError {
+  status: 'error';
+  message: string;
+  error: string;
+  data: null;
+}
+
 // Novos tipos para a API Django REST
 export interface DjangoUser {
   id: number;
@@ -59,10 +74,14 @@ export interface AuthResponse {
   token: JWTToken;
 }
 
+export interface AuthApiResponse extends ApiResponse<AuthResponse> {}
+
 export interface UserType {
   id: number;
   name: string;
 }
+
+export interface UserTypesApiResponse extends ApiResponse<UserType[]> {}
 
 export interface RegisterRequest {
   email: string;
@@ -88,6 +107,8 @@ export interface ResendCodeRequest {
 export interface RegisterResponse {
   message: string;
 }
+
+export interface RegisterApiResponse extends ApiResponse<{ user: DjangoUser }> {}
 
 export interface ProfessionalProfile {
   id: string;

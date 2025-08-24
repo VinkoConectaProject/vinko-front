@@ -1,119 +1,90 @@
 import { API_CONFIG, TOKEN_CONFIG } from '../config/api';
 import { 
-  AuthResponse, 
+  AuthApiResponse, 
+  RegisterApiResponse,
+  UserTypesApiResponse,
   RegisterRequest, 
   LoginRequest, 
   EmailVerificationRequest, 
   ResendCodeRequest, 
-  RegisterResponse,
-  UserType 
+  UserType,
+  ApiResponse,
+  ApiError
 } from '../types';
+import { BaseApiService } from './baseApiService';
 
-class AuthService {
-  private baseURL = API_CONFIG.BASE_URL;
-
-  // Função para fazer requisições HTTP
-  private async makeRequest<T>(
-    endpoint: string, 
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const defaultOptions: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const response = await fetch(url, defaultOptions);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        
-        // Se a API retornou uma mensagem específica, use ela
-        if (errorData.message) {
-          throw new Error(errorData.message);
-        }
-        
-        // Caso contrário, use mensagens genéricas baseadas no status
-        const genericMessages: Record<number, string> = {
-          400: 'Dados inválidos. Verifique as informações fornecidas.',
-          401: 'Credenciais inválidas. Verifique seu email e senha.',
-          403: 'Acesso negado. Você não tem permissão para esta ação.',
-          404: 'Recurso não encontrado.',
-          409: 'Conflito. Este email já está em uso.',
-          422: 'Dados inválidos. Verifique as informações fornecidas.',
-          429: 'Muitas tentativas. Aguarde um momento antes de tentar novamente.',
-          500: 'Erro interno do servidor. Tente novamente mais tarde.',
-          502: 'Serviço temporariamente indisponível. Tente novamente.',
-          503: 'Serviço em manutenção. Tente novamente mais tarde.',
-        };
-        
-        const genericMessage = genericMessages[response.status] || `Erro ${response.status}. Tente novamente.`;
-        throw new Error(genericMessage);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Erro na requisição:', error);
-      
-      // Se já é um Error com mensagem, apenas rethrow
-      if (error instanceof Error) {
-        throw error;
-      }
-      
-      // Caso contrário, criar um erro genérico
-      throw new Error('Erro inesperado. Verifique sua conexão e tente novamente.');
-    }
-  }
-
+class AuthService extends BaseApiService {
   // Obter tipos de usuário
   async getUserTypes(name?: string): Promise<UserType[]> {
     const queryParams = name ? `?name=${encodeURIComponent(name)}` : '';
-    return this.makeRequest<UserType[]>(`${API_CONFIG.ENDPOINTS.USER.USER_TYPES}${queryParams}`);
+    const response = await this.makeRequest<UserType[]>(`${API_CONFIG.ENDPOINTS.USER.USER_TYPES}${queryParams}`);
+    return response.data;
   }
 
   // Registrar usuário
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
-    return this.makeRequest<RegisterResponse>(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
+  async register(data: RegisterRequest): Promise<{ user: any; message: string }> {
+    const response = await this.makeRequest<{ user: any }>(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    return {
+      user: response.data.user,
+      message: response.message
+    };
   }
 
   // Login
-  async login(data: LoginRequest): Promise<AuthResponse> {
-    return this.makeRequest<AuthResponse>(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
+  async login(data: LoginRequest): Promise<{ user: any; token: any; message: string }> {
+    const response = await this.makeRequest<{ user: any; token: any }>(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    return {
+      user: response.data.user,
+      token: response.data.token,
+      message: response.message
+    };
   }
 
   // Verificar código de email
-  async verifyEmail(data: EmailVerificationRequest): Promise<AuthResponse> {
-    return this.makeRequest<AuthResponse>(API_CONFIG.ENDPOINTS.AUTH.VERIFY_EMAIL, {
+  async verifyEmail(data: EmailVerificationRequest): Promise<{ user: any; token: any; message: string }> {
+    const response = await this.makeRequest<{ user: any; token: any }>(API_CONFIG.ENDPOINTS.AUTH.VERIFY_EMAIL, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    return {
+      user: response.data.user,
+      token: response.data.token,
+      message: response.message
+    };
   }
 
   // Reenviar código de verificação
   async resendVerificationCode(data: ResendCodeRequest): Promise<{ message: string }> {
-    return this.makeRequest<{ message: string }>(API_CONFIG.ENDPOINTS.AUTH.RESEND_CODE, {
+    const response = await this.makeRequest<{ message: string }>(API_CONFIG.ENDPOINTS.AUTH.RESEND_CODE, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    return {
+      message: response.message
+    };
   }
 
   // Refresh token
-  async refreshToken(refreshToken: string): Promise<{ access: string }> {
-    return this.makeRequest<{ access: string }>(API_CONFIG.ENDPOINTS.AUTH.TOKEN_REFRESH, {
+  async refreshToken(refreshToken: string): Promise<{ access: string; message: string }> {
+    const response = await this.makeRequest<{ access: string }>(API_CONFIG.ENDPOINTS.AUTH.TOKEN_REFRESH, {
       method: 'POST',
       body: JSON.stringify({ refresh: refreshToken }),
     });
+    
+    return {
+      access: response.data.access,
+      message: response.message
+    };
   }
 
   // Salvar tokens no localStorage

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { authService } from '../../services/authService';
-import { MessageBox } from '../UI/MessageBox';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import { ApiMessage } from '../UI/ApiMessage';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -14,17 +15,16 @@ interface LoginFormProps {
 
 export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBackToLanding, onShowEmailVerification }: LoginFormProps) {
   const { dispatch } = useApp();
+  const { apiMessage, handleApiError, handleApiSuccess, hideMessage } = useApiMessage();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrors([]);
     setIsLoading(true);
 
     try {
@@ -44,6 +44,9 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
       // Salvar tokens
       authService.saveTokens(authData.token.access, authData.token.refresh);
       
+      // Mostrar mensagem de sucesso
+      handleApiSuccess(authData.message);
+      
       // Atualizar contexto com o usuário Django
       dispatch({ type: 'SET_DJANGO_USER', payload: authData.user });
       
@@ -53,20 +56,15 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
     } catch (error: unknown) {
       console.error('Erro no login:', error);
       
-      let errorMessage = 'Erro interno. Tente novamente.';
-      
-      if (error instanceof Error) {
-        // Verificar se é o erro específico de email não verificado
-        if (error.message.includes('não verificado') || error.message.includes('verificado')) {
-          // Redirecionar para verificação de email
-          onShowEmailVerification(formData.email.toLowerCase().trim());
-          return;
-        }
-        
-        errorMessage = error.message;
+      // Verificar se é o erro específico de email não verificado
+      if (error instanceof Error && (error.message.includes('não verificado') || error.message.includes('verificado'))) {
+        // Redirecionar para verificação de email
+        onShowEmailVerification(formData.email.toLowerCase().trim());
+        return;
       }
       
-      setErrors([errorMessage]);
+      // Tratar outros erros
+      handleApiError(error);
     } finally {
       setIsLoading(false);
     }
@@ -83,18 +81,16 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {errors.length > 0 && (
+        {apiMessage.show && (
           <div className="mb-6">
-            {errors.map((error, index) => (
-              <MessageBox
-                key={index}
-                type="error"
-                message={error}
-                className="mb-3"
-              />
-            ))}
+            <ApiMessage
+              message={apiMessage.message}
+              type={apiMessage.type}
+              show={apiMessage.show}
+              onClose={hideMessage}
+            />
           </div>
-        )}
+          )}
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">

@@ -7,6 +7,8 @@ export const API_CONFIG = {
       TOKEN_REFRESH: '/token/refresh/',
       VERIFY_EMAIL: '/user/email-verification-codes/verify/',
       RESEND_CODE: '/user/email-verification-codes/resend/',
+      PASSWORD_RESET: '/user/password-reset/',
+      PASSWORD_RESET_CONFIRM: '/user/password-reset-confirm/',
     },
     USER: {
       USER_TYPES: '/user/user-types/',

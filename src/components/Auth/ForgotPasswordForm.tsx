@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { authService } from '../../services/authService';
+import { ApiMessage } from '../UI/ApiMessage';
 
 interface ForgotPasswordFormProps {
   onBack: () => void;
@@ -9,16 +11,25 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setMessage(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const response = await authService.requestPasswordReset({ email });
+      setMessage({ type: 'success', text: response.message });
       setIsSubmitted(true);
-    }, 1500);
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Erro ao enviar email de recuperação. Tente novamente.' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -72,6 +83,16 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
           Digite seu email e enviaremos um link para redefinir sua senha
         </p>
       </div>
+
+      {message && (
+        <div className="mb-6">
+          <ApiMessage
+            type={message.type}
+            message={message.text}
+            onClose={() => setMessage(null)}
+          />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>

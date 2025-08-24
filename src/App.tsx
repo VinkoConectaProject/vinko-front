@@ -5,6 +5,7 @@ import { LoginForm } from './components/Auth/LoginForm';
 import { RegisterForm } from './components/Auth/RegisterForm';
 import { ForgotPasswordForm } from './components/Auth/ForgotPasswordForm';
 import { EmailVerification } from './components/Auth/EmailVerification';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { ProfessionalDashboard } from './components/Dashboard/ProfessionalDashboard';
@@ -28,8 +29,9 @@ function AppContent() {
   const [showDemandForm, setShowDemandForm] = useState(false);
   const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [appState, setAppState] = useState<'loading' | 'landing' | 'auth' | 'emailVerification' | 'dashboard'>('loading');
+  const [appState, setAppState] = useState<'loading' | 'landing' | 'auth' | 'emailVerification' | 'resetPassword' | 'dashboard'>('loading');
   const [verificationEmail, setVerificationEmail] = useState<string>('');
+  const [resetPasswordCode, setResetPasswordCode] = useState<string>('');
 
   const handleLogout = () => {
     dispatch({ type: 'LOGOUT' });
@@ -47,9 +49,13 @@ function AppContent() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const authParam = urlParams.get('auth');
+    const codeParam = urlParams.get('code');
 
     if (state.currentUser || state.djangoUser) {
       setAppState('dashboard');
+    } else if (codeParam) {
+      setResetPasswordCode(codeParam);
+      setAppState('resetPassword');
     } else if (authParam) {
       setAppState('auth');
       setAuthMode(authParam === 'register' ? 'register' : authParam === 'forgot' ? 'forgot' : 'login');
@@ -75,6 +81,16 @@ function AppContent() {
   const handleGoToLogin = () => {
     setAuthMode('login');
     setAppState('auth');
+  };
+
+  const handleResetPasswordSuccess = () => {
+    setAppState('auth');
+    setAuthMode('login');
+  };
+
+  const handleResetPasswordBack = () => {
+    setAppState('auth');
+    setAuthMode('login');
   };
 
   const startConversation = (otherUserId: string, demandId?: string, initialMessage?: string) => {
@@ -215,6 +231,17 @@ function AppContent() {
         onVerificationSuccess={handleEmailVerificationSuccess}
         onBack={handleBackToAuth}
         onGoToLogin={handleGoToLogin}
+      />
+    );
+  }
+
+  // Reset Password
+  if (appState === 'resetPassword') {
+    return (
+      <ResetPasswordPage 
+        code={resetPasswordCode} 
+        onSuccess={handleResetPasswordSuccess}
+        onBack={handleResetPasswordBack}
       />
     );
   }

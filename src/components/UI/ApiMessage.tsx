@@ -4,18 +4,14 @@ import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 interface ApiMessageProps {
   message: string;
   type: 'success' | 'error' | 'info';
-  show: boolean;
   onClose: () => void;
 }
 
 export const ApiMessage: React.FC<ApiMessageProps> = ({ 
   message, 
   type, 
-  show, 
   onClose 
 }) => {
-  if (!show) return null;
-
   const getIcon = () => {
     switch (type) {
       case 'success':
@@ -56,25 +52,23 @@ export const ApiMessage: React.FC<ApiMessageProps> = ({
   };
 
   return (
-    <div className={`fixed top-4 right-4 z-50 max-w-md w-full animate-in slide-in-from-right-2 duration-300`}>
-      <div className={`${getBgColor()} border rounded-lg p-4 shadow-lg`}>
-        <div className="flex items-start space-x-3">
-          <div className="flex-shrink-0">
-            {getIcon()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className={`text-sm font-medium ${getTextColor()}`}>
-              {message}
-            </p>
-          </div>
-          <div className="flex-shrink-0">
-            <button
-              onClick={onClose}
-              className={`${getTextColor()} hover:opacity-75 transition-opacity`}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+    <div className={`${getBgColor()} border rounded-lg p-4 shadow-lg mb-4`}>
+      <div className="flex items-start space-x-3">
+        <div className="flex-shrink-0">
+          {getIcon()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium ${getTextColor()}`}>
+            {message}
+          </p>
+        </div>
+        <div className="flex-shrink-0">
+          <button
+            onClick={onClose}
+            className={`${getTextColor()} hover:opacity-75 transition-opacity`}
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>

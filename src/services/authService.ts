@@ -7,6 +7,8 @@ import {
   LoginRequest, 
   EmailVerificationRequest, 
   ResendCodeRequest, 
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
   UserType,
   ApiResponse,
   ApiError
@@ -65,6 +67,30 @@ class AuthService extends BaseApiService {
   // Reenviar código de verificação
   async resendVerificationCode(data: ResendCodeRequest): Promise<{ message: string }> {
     const response = await this.makeRequest<{ message: string }>(API_CONFIG.ENDPOINTS.AUTH.RESEND_CODE, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    
+    return {
+      message: response.message
+    };
+  }
+
+  // Solicitar recuperação de senha
+  async requestPasswordReset(data: PasswordResetRequest): Promise<{ message: string }> {
+    const response = await this.makeRequest<{ message: string }>(API_CONFIG.ENDPOINTS.AUTH.PASSWORD_RESET, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    
+    return {
+      message: response.message
+    };
+  }
+
+  // Confirmar nova senha
+  async confirmPasswordReset(data: PasswordResetConfirmRequest): Promise<{ message: string }> {
+    const response = await this.makeRequest<{ message: string }>(API_CONFIG.ENDPOINTS.AUTH.PASSWORD_RESET_CONFIRM, {
       method: 'POST',
       body: JSON.stringify(data),
     });

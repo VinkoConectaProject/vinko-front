@@ -104,6 +104,16 @@ export interface ResendCodeRequest {
   email: string;
 }
 
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirmRequest {
+  code: string;
+  password: string;
+  password2: string;
+}
+
 export interface RegisterResponse {
   message: string;
 }

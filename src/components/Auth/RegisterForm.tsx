@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, User, Building } from 'lucide-react';
-import { UserType as DjangoUserType } from '../../types';
 import { authService } from '../../services/authService';
 import { useApiMessage } from '../../hooks/useApiMessage';
 import { ApiMessage } from '../UI/ApiMessage';
@@ -24,22 +23,6 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [userTypes, setUserTypes] = useState<DjangoUserType[]>([]);
-
-  // Carregar tipos de usuário da API
-  useEffect(() => {
-    const loadUserTypes = async () => {
-      try {
-        const types = await authService.getUserTypes();
-        setUserTypes(types);
-      } catch (error) {
-        console.error('Erro ao carregar tipos de usuário:', error);
-        handleApiError(error);
-      }
-    };
-
-    loadUserTypes();
-  }, [handleApiError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,20 +41,15 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
     }
 
     try {
-      // Mapear os tipos do frontend para os nomes da API
+      // Mapear os tipos do frontend para os valores da API
       const typeMapping: Record<string, string> = {
-        'professional': 'profissional',
-        'client': 'cliente'
+        'professional': 'PROFISSIONAL',
+        'client': 'CLIENTE'
       };
 
-      const apiTypeName = typeMapping[formData.userType];
+      const apiUserType = typeMapping[formData.userType];
       
-      // Encontrar o user_type_id baseado no tipo mapeado
-      const selectedUserType = userTypes.find(type => 
-        type.name.toLowerCase() === apiTypeName.toLowerCase()
-      );
-
-      if (!selectedUserType) {
+      if (!apiUserType) {
         handleApiError(ERROR_MESSAGES.BAD_REQUEST);
         setIsLoading(false);
         return;
@@ -82,7 +60,7 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
         email: formData.email.toLowerCase(),
         password: formData.password,
         password2: formData.confirmPassword,
-        user_type_id: selectedUserType.id,
+        user_type: apiUserType,
       });
 
       // Mostrar mensagem de sucesso
@@ -189,7 +167,6 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
             <ApiMessage
               message={apiMessage.message}
               type={apiMessage.type}
-              show={apiMessage.show}
               onClose={hideMessage}
             />
           </div>

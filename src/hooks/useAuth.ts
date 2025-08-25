@@ -95,6 +95,9 @@ export const useAuth = () => {
       // Salvar tokens
       authService.saveTokens(authData.token.access, authData.token.refresh);
       
+      // Salvar user_type no localStorage
+      localStorage.setItem('vinko-user-type', authData.user.user_type);
+      
       // Atualizar contexto
       dispatch({ type: 'SET_DJANGO_USER', payload: authData.user });
       
@@ -113,22 +116,16 @@ export const useAuth = () => {
     dispatch({ type: 'SET_AUTH_ERROR', payload: null });
 
     try {
-      // Mapear os tipos do frontend para os nomes da API
+      // Mapear os tipos do frontend para os valores da API
       const typeMapping: Record<string, string> = {
-        'professional': 'profissional',
-        'client': 'cliente'
+        'professional': 'PROFISSIONAL',
+        'client': 'CLIENTE'
       };
 
-      const apiTypeName = typeMapping[userType];
+      const apiUserType = typeMapping[userType];
       
-      // Obter tipos de usuário
-      const userTypes = await authService.getUserTypes();
-      const selectedUserType = userTypes.find(type => 
-        type.name.toLowerCase() === apiTypeName.toLowerCase()
-      );
-
-      if (!selectedUserType) {
-        throw new Error('Tipo de usuário não encontrado');
+      if (!apiUserType) {
+        throw new Error('Tipo de usuário inválido');
       }
 
       // Registrar usuário
@@ -136,7 +133,7 @@ export const useAuth = () => {
         email: email.toLowerCase(),
         password,
         password2,
-        user_type_id: selectedUserType.id,
+        user_type: apiUserType,
       });
 
       return { success: true, message: 'Conta criada! Verifique seu e-mail para ativar sua conta.' };
@@ -158,6 +155,9 @@ export const useAuth = () => {
       
       // Salvar tokens
       authService.saveTokens(authData.token.access, authData.token.refresh);
+      
+      // Salvar user_type no localStorage
+      localStorage.setItem('vinko-user-type', authData.user.user_type);
       
       // Atualizar contexto
       dispatch({ type: 'SET_DJANGO_USER', payload: authData.user });
@@ -210,6 +210,10 @@ export const useAuth = () => {
     return state.djangoUser;
   }, [state.djangoUser]);
 
+  const getUserType = useCallback((): string | null => {
+    return localStorage.getItem('vinko-user-type');
+  }, []);
+
   return {
     // Estado
     user: state.djangoUser,
@@ -224,5 +228,6 @@ export const useAuth = () => {
     resendVerificationCode,
     logout,
     getCurrentUser,
+    getUserType,
   };
 };

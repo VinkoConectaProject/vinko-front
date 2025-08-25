@@ -12,6 +12,7 @@ import {
   Shield
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, currentPage, onPageChange }: SidebarProps) {
   const { state } = useApp();
+  const { getUserType } = useAuth();
 
   const professionalMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -48,10 +50,11 @@ export function Sidebar({ isOpen, currentPage, onPageChange }: SidebarProps) {
     { id: 'moderation', label: 'Moderação', icon: Shield },
   ];
 
-  let menuItems = state.currentUser?.type === 'professional' ? professionalMenuItems : clientMenuItems;
+  const userType = getUserType();
+  let menuItems = userType === 'PROFISSIONAL' ? professionalMenuItems : clientMenuItems;
   
   // Add admin menu if user is admin (you can add admin detection logic here)
-  if (state.currentUser?.email === 'admin@vinko.com') {
+  if (state.djangoUser?.email === 'admin@vinko.com') {
     menuItems = [...menuItems, ...adminMenuItems];
   }
 
@@ -68,7 +71,7 @@ export function Sidebar({ isOpen, currentPage, onPageChange }: SidebarProps) {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-900">
-              {state.currentUser?.type === 'professional' ? 'Profissional' : 'Cliente'}
+              {userType === 'PROFISSIONAL' ? 'Profissional' : 'Cliente'}
             </p>
             <p className="text-xs text-gray-500">Online</p>
           </div>

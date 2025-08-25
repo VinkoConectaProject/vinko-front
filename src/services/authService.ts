@@ -2,7 +2,6 @@ import { API_CONFIG, TOKEN_CONFIG } from '../config/api';
 import { 
   AuthApiResponse, 
   RegisterApiResponse,
-  UserTypesApiResponse,
   RegisterRequest, 
   LoginRequest, 
   EmailVerificationRequest, 
@@ -10,20 +9,12 @@ import {
   PasswordResetRequest,
   PasswordResetConfirmRequest,
   PasswordResetValidateRequest,
-  UserType,
   ApiResponse,
   ApiError
 } from '../types';
 import { BaseApiService } from './baseApiService';
 
 class AuthService extends BaseApiService {
-  // Obter tipos de usuário
-  async getUserTypes(name?: string): Promise<UserType[]> {
-    const queryParams = name ? `?name=${encodeURIComponent(name)}` : '';
-    const response = await this.makeRequest<UserType[]>(`${API_CONFIG.ENDPOINTS.USER.USER_TYPES}${queryParams}`);
-    return response.data;
-  }
-
   // Registrar usuário
   async register(data: RegisterRequest): Promise<{ user: any; message: string }> {
     const response = await this.makeRequest<{ user: any }>(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
@@ -169,6 +160,7 @@ class AuthService extends BaseApiService {
     localStorage.removeItem('vinko-current-user');
     localStorage.removeItem('vinko-users');
     localStorage.removeItem('vinko-data');
+    localStorage.removeItem('vinko-user-type');
     
     // Limpar dados de sessão
     sessionStorage.clear();

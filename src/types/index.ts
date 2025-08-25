@@ -55,7 +55,7 @@ export interface DjangoUser {
   corporate_name: string | null;
   trade_name: string | null;
   professional_description: string | null;
-  user_type: number;
+  user_type: string; // Agora é uma string: 'CLIENTE' ou 'PROFISSIONAL'
   professional_experience: string | null;
   specialty: string | null;
   availability: string | null;
@@ -87,7 +87,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   password2: string;
-  user_type_id: number;
+  user_type: string; // Agora é uma string: 'CLIENTE' ou 'PROFISSIONAL'
 }
 
 export interface LoginRequest {

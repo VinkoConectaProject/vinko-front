@@ -28,6 +28,7 @@ type AppAction =
   | { type: 'CLEANUP_OLD_DATA'; payload: { messages: Message[]; conversations: Conversation[] } }
   | { type: 'ADD_RATING'; payload: Rating }
   | { type: 'LOAD_DATA'; payload: Partial<AppState> }
+  | { type: 'SAVE_USER_TYPE'; payload: string }
   | { type: 'LOGOUT' };
 
 const initialState: AppState = {
@@ -187,6 +188,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, authLoading: action.payload };
     case 'SET_AUTH_ERROR':
       return { ...state, authError: action.payload };
+    case 'SAVE_USER_TYPE':
+      // Salvar user_type no localStorage
+      localStorage.setItem('vinko-user-type', action.payload);
+      return { ...state };
     case 'LOGOUT':
       return { 
         ...initialState,

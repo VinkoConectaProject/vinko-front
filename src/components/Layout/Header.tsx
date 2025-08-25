@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bell, User, Search, Menu } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { useAuth } from '../../hooks/useAuth';
 import { LogoutButton } from '../UI/LogoutButton';
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export function Header({ onMenuToggle, currentPage, onPageChange }: HeaderProps) {
   const { state } = useApp();
+  const { getUserType } = useAuth();
   const unreadNotifications = state.notifications.filter(n => !n.isRead).length;
 
   const handleNotificationClick = () => {
@@ -68,9 +70,9 @@ export function Header({ onMenuToggle, currentPage, onPageChange }: HeaderProps)
             <div className="flex items-center space-x-3">
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-medium text-gray-900">
-                  {state.currentUser?.type === 'professional' ? 'Profissional' : 'Cliente'}
+                  {getUserType() === 'PROFISSIONAL' ? 'Profissional' : 'Cliente'}
                 </p>
-                <p className="text-xs text-gray-500">{state.currentUser?.email}</p>
+                <p className="text-xs text-gray-500">{state.djangoUser?.email}</p>
               </div>
               <div className="flex items-center space-x-2">
                 <button 

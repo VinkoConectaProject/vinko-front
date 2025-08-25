@@ -21,9 +21,11 @@ import { NotificationsPage } from './components/Notifications/NotificationsPage'
 import { MessagesPage } from './components/Messages/MessagesPage';
 import { DjangoUser } from './types';
 import { authService } from './services/authService';
+import { useAuth } from './hooks/useAuth';
 
 function AppContent() {
   const { state, dispatch } = useApp();
+  const { getUserType } = useAuth();
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -273,7 +275,7 @@ function AppContent() {
     }
 
     // Professional pages
-    if (state.currentUser?.type === 'professional') {
+    if (getUserType() === 'PROFISSIONAL') {
       switch (currentPage) {
         case 'dashboard':
           return (
@@ -307,7 +309,7 @@ function AppContent() {
     }
 
     // Client pages
-    if (state.currentUser?.type === 'client') {
+    if (getUserType() === 'CLIENTE') {
       switch (currentPage) {
         case 'dashboard':
           return (

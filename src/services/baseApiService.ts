@@ -31,9 +31,13 @@ export class BaseApiService {
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
+    // Adicionar token de autorização se disponível
+    const authHeaders = this.getAuthHeaders();
+    
     const defaultOptions: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
         ...options.headers,
       },
       ...options,
@@ -120,14 +124,21 @@ export class BaseApiService {
     try {
       const refreshToken = authService.getRefreshToken();
       if (!refreshToken) {
-        throw new Error('Refresh token não encontrado');
+        this.processQueue(new Error('Refresh token não encontrado'), null);
+        return null;
       }
 
-      const { access } = await authService.refreshToken(refreshToken);
-      authService.saveTokens(access, refreshToken);
+      // Fazer refresh diretamente sem chamar checkAndRefreshTokens
+      const newTokens = await authService.refreshToken(refreshToken);
       
-      this.processQueue(null, access);
-      return access;
+      // Buscar dados atualizados do usuário
+      const currentUser = await authService.getCurrentUser();
+      
+      // Salvar novos dados
+      authService.saveAuthData(newTokens.access, newTokens.refresh, currentUser);
+      
+      this.processQueue(null, newTokens.access);
+      return newTokens.access;
     } catch (error) {
       this.processQueue(error, null);
       return null;
@@ -138,25 +149,9 @@ export class BaseApiService {
 
   // Função para adicionar token de autorização
   protected getAuthHeaders(): Record<string, string> {
-    const token = localStorage.getItem('vinko_access_token');
+    const token = authService.getAccessToken();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
-  // Função para fazer requisições autenticadas
-  protected async makeAuthenticatedRequest<T>(
-    endpoint: string, 
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const authHeaders = this.getAuthHeaders();
-    
-    const updatedOptions: RequestInit = {
-      ...options,
-      headers: {
-        ...authHeaders,
-        ...options.headers,
-      },
-    };
 
-    return this.makeRequest<T>(endpoint, updatedOptions);
-  }
 }

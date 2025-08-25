@@ -69,12 +69,29 @@ export interface JWTToken {
   access: string;
 }
 
+export interface TokenResponse {
+  access: string;
+  refresh: string;
+}
+
 export interface AuthResponse {
   user: DjangoUser;
   token: JWTToken;
 }
 
+export interface LoginResponse {
+  status: string;
+  message: string;
+  error: string;
+  data: {
+    user: DjangoUser;
+    token: JWTToken;
+  };
+}
+
+export interface TokenApiResponse extends ApiResponse<TokenResponse> {}
 export interface AuthApiResponse extends ApiResponse<AuthResponse> {}
+export interface LoginApiResponse extends ApiResponse<LoginResponse> {}
 
 export interface UserType {
   id: number;

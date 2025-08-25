@@ -28,7 +28,6 @@ type AppAction =
   | { type: 'CLEANUP_OLD_DATA'; payload: { messages: Message[]; conversations: Conversation[] } }
   | { type: 'ADD_RATING'; payload: Rating }
   | { type: 'LOAD_DATA'; payload: Partial<AppState> }
-  | { type: 'SAVE_USER_TYPE'; payload: string }
   | { type: 'LOGOUT' };
 
 const initialState: AppState = {
@@ -188,10 +187,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, authLoading: action.payload };
     case 'SET_AUTH_ERROR':
       return { ...state, authError: action.payload };
-    case 'SAVE_USER_TYPE':
-      // Salvar user_type no localStorage
-      localStorage.setItem('vinko-user-type', action.payload);
-      return { ...state };
     case 'LOGOUT':
       return { 
         ...initialState,
@@ -279,37 +274,31 @@ try {
     };
   }, []);
 
-  // Salvar dados no localStorage
+  // Salvar dados quando mudarem (de forma controlada)
   useEffect(() => {
     if (!state.isLoading) {
-      // Salvar usuários separadamente
-      try {
-        localStorage.setItem('vinko-users', JSON.stringify(state.users));
-      } catch (error) {
-        console.error('Erro ao salvar usuários:', error);
-      }
-      
-      // Não salvar currentUser no vinko-data, ele fica separado
-      const dataToSave = {
-        professionalProfiles: state.professionalProfiles,
-        clientProfiles: state.clientProfiles,
-        demands: state.demands,
-        notifications: state.notifications,
-        conversations: state.conversations,
-        messages: state.messages,
-        ratings: state.ratings,
-      };
-      
-      try {
-        localStorage.setItem('vinko-data', JSON.stringify(dataToSave));
-        
-        // Salvar currentUser separadamente se existir
-        if (state.currentUser) {
-          localStorage.setItem('vinko-current-user', JSON.stringify(state.currentUser));
+      const timeoutId = setTimeout(() => {
+        try {
+          localStorage.setItem('vinko-users', JSON.stringify(state.users));
+          localStorage.setItem('vinko-data', JSON.stringify({
+            professionalProfiles: state.professionalProfiles,
+            clientProfiles: state.clientProfiles,
+            demands: state.demands,
+            notifications: state.notifications,
+            conversations: state.conversations,
+            messages: state.messages,
+            ratings: state.ratings,
+          }));
+          
+          if (state.currentUser) {
+            localStorage.setItem('vinko-current-user', JSON.stringify(state.currentUser));
+          }
+        } catch (error) {
+          console.error('Erro ao salvar dados:', error);
         }
-      } catch (error) {
-        console.error('Erro ao salvar dados:', error);
-      }
+      }, 1000); // Debounce de 1 segundo
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [state.users, state.currentUser, state.professionalProfiles, state.clientProfiles, state.demands, state.notifications, state.conversations, state.messages, state.ratings, state.isLoading]);
 

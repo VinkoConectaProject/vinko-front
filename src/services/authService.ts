@@ -1,7 +1,5 @@
 import { API_CONFIG, TOKEN_CONFIG } from '../config/api';
 import { 
-  AuthApiResponse, 
-  RegisterApiResponse,
   RegisterRequest, 
   LoginRequest, 
   EmailVerificationRequest, 
@@ -9,15 +7,25 @@ import {
   PasswordResetRequest,
   PasswordResetConfirmRequest,
   PasswordResetValidateRequest,
-  ApiResponse,
-  ApiError
+  TokenResponse,
+  DjangoUser
 } from '../types';
 import { BaseApiService } from './baseApiService';
 
 class AuthService extends BaseApiService {
+  // Obter tokens (login)
+  async getTokens(email: string, password: string): Promise<TokenResponse> {
+    const response = await this.makeRequest<TokenResponse>(API_CONFIG.ENDPOINTS.AUTH.TOKEN, {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    
+    return response.data;
+  }
+
   // Registrar usuário
-  async register(data: RegisterRequest): Promise<{ user: any; message: string }> {
-    const response = await this.makeRequest<{ user: any }>(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
+  async register(data: RegisterRequest): Promise<{ user: DjangoUser; message: string }> {
+    const response = await this.makeRequest<{ user: DjangoUser }>(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -29,8 +37,8 @@ class AuthService extends BaseApiService {
   }
 
   // Login
-  async login(data: LoginRequest): Promise<{ user: any; token: any; message: string }> {
-    const response = await this.makeRequest<{ user: any; token: any }>(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
+  async login(data: LoginRequest): Promise<{ user: DjangoUser; token: TokenResponse; message: string }> {
+    const response = await this.makeRequest<{ user: DjangoUser; token: TokenResponse }>(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -43,8 +51,8 @@ class AuthService extends BaseApiService {
   }
 
   // Verificar código de email
-  async verifyEmail(data: EmailVerificationRequest): Promise<{ user: any; token: any; message: string }> {
-    const response = await this.makeRequest<{ user: any; token: any }>(API_CONFIG.ENDPOINTS.AUTH.VERIFY_EMAIL, {
+  async verifyEmail(data: EmailVerificationRequest): Promise<{ user: DjangoUser; token: TokenResponse; message: string }> {
+    const response = await this.makeRequest<{ user: DjangoUser; token: TokenResponse }>(API_CONFIG.ENDPOINTS.AUTH.VERIFY_EMAIL, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -105,26 +113,42 @@ class AuthService extends BaseApiService {
   }
 
   // Refresh token
-  async refreshToken(refreshToken: string): Promise<{ access: string; message: string }> {
-    const response = await this.makeRequest<{ access: string }>(API_CONFIG.ENDPOINTS.AUTH.TOKEN_REFRESH, {
+  async refreshToken(refreshToken: string): Promise<TokenResponse> {
+    const response = await this.makeRequest<TokenResponse>(API_CONFIG.ENDPOINTS.AUTH.TOKEN_REFRESH, {
       method: 'POST',
       body: JSON.stringify({ refresh: refreshToken }),
     });
     
-    return {
-      access: response.data.access,
-      message: response.message
-    };
+    return response.data;
   }
 
-  // Salvar tokens no localStorage
-  saveTokens(accessToken: string, refreshToken: string): void {
+  // Obter dados do usuário atual usando a nova rota
+  async getCurrentUser(): Promise<DjangoUser> {
+    const userId = this.getUserId();
+    if (!userId) {
+      throw new Error('User ID não encontrado');
+    }
+
+    const endpoint = API_CONFIG.ENDPOINTS.USER.USER_BY_ID.replace('id_user', userId);
+    const response = await this.makeRequest<{ user: DjangoUser; token: TokenResponse }>(endpoint, {
+      method: 'GET',
+    });
+    
+    // Atualizar tokens se fornecidos na resposta
+    if (response.data.token) {
+      this.saveAuthData(response.data.token.access, response.data.token.refresh, response.data.user);
+    }
+    
+    return response.data.user;
+  }
+
+  // Salvar dados de autenticação no localStorage (apenas as variáveis especificadas)
+  saveAuthData(accessToken: string, refreshToken: string, user: DjangoUser): void {
     localStorage.setItem(TOKEN_CONFIG.ACCESS_TOKEN_KEY, accessToken);
     localStorage.setItem(TOKEN_CONFIG.REFRESH_TOKEN_KEY, refreshToken);
-    
-    // Salvar timestamp de expiração
-    const accessExpiry = Date.now() + TOKEN_CONFIG.ACCESS_TOKEN_LIFETIME;
-    localStorage.setItem('vinko_access_expiry', accessExpiry.toString());
+    localStorage.setItem(TOKEN_CONFIG.USER_ID_KEY, user.id.toString());
+    localStorage.setItem(TOKEN_CONFIG.USER_TYPE_KEY, user.user_type);
+    localStorage.setItem(TOKEN_CONFIG.USER_KEY, JSON.stringify(user));
   }
 
   // Obter access token
@@ -137,30 +161,57 @@ class AuthService extends BaseApiService {
     return localStorage.getItem(TOKEN_CONFIG.REFRESH_TOKEN_KEY);
   }
 
-  // Verificar se o token está expirado
-  isTokenExpired(): boolean {
-    const expiry = localStorage.getItem('vinko_access_expiry');
-    if (!expiry) return true;
-    
-    return Date.now() > parseInt(expiry);
+  // Obter user ID
+  getUserId(): string | null {
+    return localStorage.getItem(TOKEN_CONFIG.USER_ID_KEY);
   }
 
-  // Limpar tokens
-  clearTokens(): void {
+  // Obter user type
+  getUserType(): string | null {
+    return localStorage.getItem(TOKEN_CONFIG.USER_TYPE_KEY);
+  }
+
+  // Obter user
+  getUser(): DjangoUser | null {
+    const userStr = localStorage.getItem(TOKEN_CONFIG.USER_KEY);
+    if (!userStr) return null;
+    
+    try {
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.error('Erro ao fazer parse do usuário:', error);
+      return null;
+    }
+  }
+
+  // Verificar se o usuário está autenticado
+  isAuthenticated(): boolean {
+    const accessToken = this.getAccessToken();
+    const refreshToken = this.getRefreshToken();
+    const userId = this.getUserId();
+    
+    if (!accessToken || !refreshToken || !userId) return false;
+    
+    return true;
+  }
+
+  // Limpar todos os dados de autenticação (apenas as variáveis especificadas)
+  clearAuthData(): void {
     localStorage.removeItem(TOKEN_CONFIG.ACCESS_TOKEN_KEY);
     localStorage.removeItem(TOKEN_CONFIG.REFRESH_TOKEN_KEY);
-    localStorage.removeItem('vinko_access_expiry');
+    localStorage.removeItem(TOKEN_CONFIG.USER_ID_KEY);
+    localStorage.removeItem(TOKEN_CONFIG.USER_TYPE_KEY);
+    localStorage.removeItem(TOKEN_CONFIG.USER_KEY);
   }
 
   // Logout completo - limpa todos os dados de autenticação
   logout(): void {
-    this.clearTokens();
+    this.clearAuthData();
     
     // Limpar dados específicos do Vinko
     localStorage.removeItem('vinko-current-user');
     localStorage.removeItem('vinko-users');
     localStorage.removeItem('vinko-data');
-    localStorage.removeItem('vinko-user-type');
     
     // Limpar dados de sessão
     sessionStorage.clear();
@@ -169,10 +220,66 @@ class AuthService extends BaseApiService {
     window.location.href = '/';
   }
 
-  // Verificar se o usuário está autenticado
-  isAuthenticated(): boolean {
-    const token = this.getAccessToken();
-    return token !== null && !this.isTokenExpired();
+  // Verificar e renovar tokens automaticamente
+  async checkAndRefreshTokens(): Promise<boolean> {
+    if (!this.isAuthenticated()) {
+      return false;
+    }
+
+    try {
+      // Primeiro, tentar fazer uma requisição simples para verificar se o access token ainda é válido
+      const userId = this.getUserId();
+      if (!userId) {
+        this.logout();
+        return false;
+      }
+
+      const endpoint = API_CONFIG.ENDPOINTS.USER.USER_BY_ID.replace('id_user', userId);
+      
+      try {
+        // Tentar fazer uma requisição com o access token atual
+        const response = await this.makeRequest<{ user: DjangoUser; token: TokenResponse }>(endpoint, {
+          method: 'GET',
+        });
+        
+        // Se a requisição foi bem-sucedida, o token ainda é válido
+        // Atualizar tokens se fornecidos na resposta
+        if (response.data.token) {
+          this.saveAuthData(response.data.token.access, response.data.token.refresh, response.data.user);
+        }
+        
+        return true;
+      } catch (error: unknown) {
+        // Se recebeu 401, o access token expirou, tentar renovar
+        if (error instanceof Error && error.message.includes('401')) {
+          const refreshToken = this.getRefreshToken();
+          if (!refreshToken) {
+            this.logout();
+            return false;
+          }
+
+          // Tentar renovar o token
+          const newTokens = await this.refreshToken(refreshToken);
+          
+          // Buscar dados atualizados do usuário
+          const currentUser = await this.getCurrentUser();
+          
+          // Salvar novos dados
+          this.saveAuthData(newTokens.access, newTokens.refresh, currentUser);
+          
+          return true;
+        } else {
+          // Outro tipo de erro, fazer logout
+          console.error('Erro ao verificar tokens:', error);
+          this.logout();
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao renovar tokens:', error);
+      this.logout();
+      return false;
+    }
   }
 }
 

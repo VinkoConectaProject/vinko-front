@@ -47,8 +47,8 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
       // Mostrar mensagem de sucesso
       handleApiSuccess(authData.message);
       
-      // Salvar tokens
-      authService.saveTokens(authData.token.access, authData.token.refresh);
+      // Salvar dados de autenticação
+      authService.saveAuthData(authData.token.access, authData.token.refresh, authData.user);
       
       // Aguardar um pouco para mostrar a mensagem de sucesso
       setTimeout(() => {
@@ -124,7 +124,6 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
           <ApiMessage
             message={apiMessage.message}
             type={apiMessage.type}
-            show={apiMessage.show}
             onClose={hideMessage}
           />
         )}

@@ -41,8 +41,8 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
         return;
       }
 
-      // Salvar tokens
-      authService.saveTokens(authData.token.access, authData.token.refresh);
+      // Salvar dados de autenticação
+      authService.saveAuthData(authData.token.access, authData.token.refresh, authData.user);
       
       // Mostrar mensagem de sucesso
       handleApiSuccess(authData.message);
@@ -86,7 +86,6 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
             <ApiMessage
               message={apiMessage.message}
               type={apiMessage.type}
-              show={apiMessage.show}
               onClose={hideMessage}
             />
           </div>

@@ -19,6 +19,7 @@ import { MyDemandsPage } from './components/Demands/MyDemandsPage';
 import { MyJobsPage } from './components/Jobs/MyJobsPage';
 import { NotificationsPage } from './components/Notifications/NotificationsPage';
 import { MessagesPage } from './components/Messages/MessagesPage';
+import { HelpCenterPage } from './components/HelpCenter/HelpCenterPage';
 import { DjangoUser } from './types';
 import { authService } from './services/authService';
 import { useAuth } from './hooks/useAuth';
@@ -301,8 +302,8 @@ function AppContent() {
               onStartConversation={startConversation}
             />
           );
-        case 'settings':
-          return <div className="p-6"><h1 className="text-2xl font-bold">Configurações</h1><p className="text-gray-600">Em desenvolvimento...</p></div>;
+        case 'help-center':
+          return <HelpCenterPage />;
         default:
           return <ProfessionalDashboard onPageChange={setCurrentPage} />;
       }
@@ -351,8 +352,8 @@ function AppContent() {
               onStartConversation={startConversation}
             />
           );
-        case 'settings':
-          return <div className="p-6"><h1 className="text-2xl font-bold">Configurações</h1><p className="text-gray-600">Em desenvolvimento...</p></div>;
+        case 'help-center':
+          return <HelpCenterPage />;
         default:
           return (
             <ClientDashboard 
@@ -381,7 +382,7 @@ function AppContent() {
       'find-professionals': 'Buscar Profissionais',
       'my-demands': 'Minhas Demandas',
       'messages': 'Mensagens',
-      'settings': 'Configurações',
+      'help-center': 'Central de Dúvidas',
       'admin-dashboard': 'Painel Admin',
       'manage-users': 'Gerenciar Usuários',
       'manage-demands': 'Gerenciar Demandas',

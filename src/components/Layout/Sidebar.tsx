@@ -5,7 +5,7 @@ import {
   Briefcase, 
   Search, 
   MessageSquare, 
-  Settings,
+  HelpCircle,
   Users,
   FileText,
   BarChart3,
@@ -30,7 +30,7 @@ export function Sidebar({ isOpen, currentPage, onPageChange }: SidebarProps) {
     { id: 'opportunities', label: 'Oportunidades', icon: Briefcase },
     { id: 'my-jobs', label: 'Meus Trabalhos', icon: FileText },
     { id: 'messages', label: 'Mensagens', icon: MessageSquare },
-    { id: 'settings', label: 'Configurações', icon: Settings },
+    { id: 'help-center', label: 'Central de Dúvidas', icon: HelpCircle },
   ];
 
   const clientMenuItems = [
@@ -39,7 +39,7 @@ export function Sidebar({ isOpen, currentPage, onPageChange }: SidebarProps) {
     { id: 'find-professionals', label: 'Buscar Profissionais', icon: Search },
     { id: 'my-demands', label: 'Minhas Demandas', icon: Briefcase },
     { id: 'messages', label: 'Mensagens', icon: MessageSquare },
-    { id: 'settings', label: 'Configurações', icon: Settings },
+    { id: 'help-center', label: 'Central de Dúvidas', icon: HelpCircle },
   ];
 
   const adminMenuItems = [

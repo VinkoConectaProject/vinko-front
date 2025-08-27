@@ -1,67 +1,178 @@
 import React, { useState, useEffect } from 'react';
-import { User, MapPin, Phone, Mail, Briefcase, Star, Save, Award, MessageSquare } from 'lucide-react';
+import { Calendar, X } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { ProfessionalProfile, Rating } from '../../types';
+import { ProfessionalProfile } from '../../types';
+
+type TabType = 'personal' | 'commercial' | 'interests';
+
+interface FormData {
+  // Dados Pessoais
+  fullName: string;
+  cpf: string;
+  phone: string;
+  email: string;
+  cep: string;
+  address: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  
+  // Dados Comerciais
+  companySize: string;
+  cnpj: string;
+  corporateName: string;
+  tradeName: string;
+  commercialCep: string;
+  commercialAddress: string;
+  commercialNumber: string;
+  commercialComplement: string;
+  commercialNeighborhood: string;
+  commercialCity: string;
+  commercialState: string;
+  commercialEmail: string;
+  
+  // Interesses
+  serviceTypes: string[];
+  operationAreas: string[];
+  specialties: string[];
+  machinery: string[];
+  fabricTypes: string[];
+  experienceYears: string;
+  dailyProductionCapacity: string;
+  minProductionQuantity: string;
+  maxProductionQuantity: string;
+  availabilityStart: string;
+}
 
 export function ProfessionalProfileForm() {
   const { state, dispatch } = useApp();
-  const [formData, setFormData] = useState<Partial<ProfessionalProfile>>({
-    name: '',
-    services: [],
-    specialty: '',
-    city: '',
-    state: '',
-    portfolio: [],
-    availability: 'available',
-    contact: {
-      phone: '',
-      whatsapp: '',
-      email: '',
-    },
-    description: '',
-    experience: '',
+  const [activeTab, setActiveTab] = useState<TabType>('personal');
+  const [formData, setFormData] = useState<FormData>({
+    // Dados Pessoais
+    fullName: 'Maria Paula',
+    cpf: '',
+    phone: '(82) 98848-8525',
+    email: 'emailregistrado@gmail.com',
+    cep: '',
+    address: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: 'Maceió',
+    state: 'Alagoas',
+    
+    // Dados Comerciais
+    companySize: 'LTDA',
+    cnpj: 'XX.XXX.XXX/0001-XX',
+    corporateName: 'Vinko Conecta',
+    tradeName: '',
+    commercialCep: '',
+    commercialAddress: '',
+    commercialNumber: 'XXX',
+    commercialComplement: '',
+    commercialNeighborhood: '',
+    commercialCity: '',
+    commercialState: '',
+    commercialEmail: 'emailregistrado@gmail.com',
+    
+    // Interesses
+    serviceTypes: [],
+    operationAreas: [],
+    specialties: [],
+    machinery: [],
+    fabricTypes: [],
+    experienceYears: '',
+    dailyProductionCapacity: '',
+    minProductionQuantity: '',
+    maxProductionQuantity: '',
+    availabilityStart: '',
   });
 
   const existingProfile = state.professionalProfiles.find(p => p.userId === state.currentUser?.id);
 
   useEffect(() => {
     if (existingProfile) {
-      setFormData(existingProfile);
+      // Carregar dados existentes se houver
+      setFormData(prev => ({
+        ...prev,
+        fullName: existingProfile.name || prev.fullName,
+        city: existingProfile.city || prev.city,
+        state: existingProfile.state || prev.state,
+      }));
     }
   }, [existingProfile]);
 
-  const serviceOptions = [
-    'Design Gráfico',
-    'Desenvolvimento Web',
-    'Marketing Digital',
-    'Fotografia',
-    'Redação',
-    'Tradução',
-    'Consultoria',
-    'Arquitetura',
-    'Engenharia',
-    'Advocacia',
-    'Contabilidade',
-    'Psicologia',
-  ];
+  const handleInputChange = (field: keyof FormData, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
-  const specialtyOptions = [
-    'Confecção sob medida',
-    'Moda Feminina',
-    'Moda Masculina',
-    'Moda Infantil',
-    'Vestidos de festa',
-    'Moda Fitness',
-    'Moda Praia',
-    'Alfaiataria',
-    'Alta Costura',
-    'Bordado',
-    'Modelagem',
-    'Corte e Costura',
-    'Facção',
-    'Estamparia',
-    'Serigrafia',
-  ];
+  // Funções de máscara
+  const applyPhoneMask = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return `(${numbers}`;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const applyCepMask = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 5) return numbers;
+    return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
+  };
+
+  const applyCpfMask = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+  };
+
+  const applyCnpjMask = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+    if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+    if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+  };
+
+  const handleMaskedInputChange = (field: keyof FormData, value: string, maskType: 'phone' | 'cep' | 'cpf' | 'cnpj') => {
+    let maskedValue = value;
+    
+    switch (maskType) {
+      case 'phone':
+        maskedValue = applyPhoneMask(value);
+        break;
+      case 'cep':
+        maskedValue = applyCepMask(value);
+        break;
+      case 'cpf':
+        maskedValue = applyCpfMask(value);
+        break;
+      case 'cnpj':
+        maskedValue = applyCnpjMask(value);
+        break;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [field]: maskedValue
+    }));
+  };
+
+  const handleTagRemove = (field: keyof FormData, tagToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: (prev[field] as string[]).filter(tag => tag !== tagToRemove)
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,20 +180,24 @@ export function ProfessionalProfileForm() {
     const profileData: ProfessionalProfile = {
       id: existingProfile?.id || Date.now().toString(),
       userId: state.currentUser?.id || '',
-      name: formData.name || '',
-      services: formData.services || [],
-      specialty: formData.specialty || '',
-      city: formData.city || '',
-      state: formData.state || '',
-      portfolio: formData.portfolio || [],
-      availability: formData.availability || 'available',
-      contact: formData.contact || { phone: '', whatsapp: '', email: '' },
-      description: formData.description || '',
-      experience: formData.experience || '',
+      name: formData.fullName,
+      services: formData.serviceTypes,
+      specialty: formData.specialties.join(', '),
+      city: formData.city,
+      state: formData.state,
+      portfolio: [],
+      availability: 'available',
+      contact: {
+        phone: formData.phone,
+        whatsapp: formData.phone,
+        email: formData.email,
+      },
+      description: '',
+      experience: formData.experienceYears,
       rating: existingProfile?.rating || 0,
       completedJobs: existingProfile?.completedJobs || 0,
       createdAt: existingProfile?.createdAt || new Date(),
-      isApproved: true, // Auto-approve for demo
+      isApproved: true,
     };
 
     if (existingProfile) {
@@ -91,286 +206,490 @@ export function ProfessionalProfileForm() {
       dispatch({ type: 'ADD_PROFESSIONAL_PROFILE', payload: profileData });
     }
 
-    // Show success message (you can implement a toast notification here)
     alert('Perfil salvo com sucesso!');
   };
 
-  const handleServiceToggle = (service: string) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services?.includes(service)
-        ? prev.services.filter(s => s !== service)
-        : [...(prev.services || []), service]
-    }));
-  };
+  const renderTag = (tag: string, field: keyof FormData) => (
+    <div key={tag} className="inline-flex items-center bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm mr-2 mb-2">
+      {tag}
+      <button
+        type="button"
+        onClick={() => handleTagRemove(field, tag)}
+        className="ml-2 text-gray-500 hover:text-gray-700"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
 
-  // Get ratings for current professional
-  const professionalRatings = state.ratings.filter(r => r.professionalId === state.currentUser?.id);
-  const averageRating = professionalRatings.length > 0 
-    ? professionalRatings.reduce((sum, r) => sum + r.stars, 0) / professionalRatings.length 
-    : 0;
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, index) => (
-      <Star
-        key={index}
-        className={`h-4 w-4 ${
-          index < rating
-            ? 'text-yellow-500 fill-current'
-            : 'text-gray-300'
-        }`}
-      />
-    ));
-  };
+  const renderSelectField = (field: keyof FormData, placeholder: string, options: string[]) => (
+    <div className="relative">
+      <select
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent appearance-none bg-white"
+        onChange={(e) => {
+          if (e.target.value) {
+            const currentValues = formData[field] as string[];
+            if (!currentValues.includes(e.target.value)) {
+              handleInputChange(field, [...currentValues, e.target.value]);
+            }
+          }
+        }}
+        value=""
+      >
+        <option value="">{placeholder}</option>
+        {options.map(option => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="py-8">
+    <div className="w-full py-8">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Meu Perfil Profissional</h1>
-        <p className="text-gray-600">
-          Complete suas informações para receber mais oportunidades
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Maria Paula - Prestador de Serviços</h1>
+        <div className="flex items-center text-gray-500 text-sm">
+          <Calendar className="h-4 w-4 mr-2" />
+          Última atualização em 22 de Abril
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Basic Information */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <User className="h-5 w-5 mr-2" />
-            Informações Básicas
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 mb-8">
+        {[
+          { id: 'personal', label: 'Dados Pessoais' },
+          { id: 'commercial', label: 'Dados Comerciais' },
+          { id: 'interests', label: 'Interesses' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as TabType)}
+            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? 'border-pink-500 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        {/* Dados Pessoais Tab */}
+        {activeTab === 'personal' && (
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Dados do Administrador</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+                <input
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) => handleInputChange('fullName', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+                <input
+                  type="text"
+                  value={formData.cpf}
+                  onChange={(e) => handleMaskedInputChange('cpf', e.target.value, 'cpf')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  placeholder="000.000.000-00"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => handleMaskedInputChange('phone', e.target.value, 'phone')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+                <input
+                  type="text"
+                  value={formData.cep}
+                  onChange={(e) => handleMaskedInputChange('cep', e.target.value, 'cep')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  placeholder="00000-000"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                <input
+                  type="text"
+                  value={formData.number}
+                  onChange={(e) => handleInputChange('number', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
+                <input
+                  type="text"
+                  value={formData.complement}
+                  onChange={(e) => handleInputChange('complement', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
+                <input
+                  type="text"
+                  value={formData.neighborhood}
+                  onChange={(e) => handleInputChange('neighborhood', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nome Completo
-              </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
               <input
                 type="text"
-                value={formData.name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  value={formData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="Seu nome completo"
-                required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Experiência Profissional
-              </label>
-              <select
-                value={formData.experience || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, experience: e.target.value }))}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+                <input
+                  type="text"
+                  value={formData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                required
-              >
-                <option value="">Selecione...</option>
-                <option value="iniciante">Iniciante (0-2 anos)</option>
-                <option value="intermediario">Intermediário (2-5 anos)</option>
-                <option value="avancado">Avançado (5-10 anos)</option>
-                <option value="expert">Expert (10+ anos)</option>
-              </select>
+                />
+              </div>
             </div>
           </div>
+        )}
 
+        {/* Dados Comerciais Tab */}
+        {activeTab === 'commercial' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Especialidade
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Dados da Empresa</h2>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Porte da empresa: <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {['MEI', 'LTDA', 'ME', 'CPF'].map((size) => (
+                  <label key={size} className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="companySize"
+                      value={size}
+                      checked={formData.companySize === size}
+                      onChange={(e) => handleInputChange('companySize', e.target.value)}
+                      className="w-4 h-4 text-pink-600 border-gray-300 focus:ring-pink-500 mr-3"
+                    />
+                    {size}
             </label>
-            <select
-              value={formData.specialty || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, specialty: e.target.value }))}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              required
-            >
-              <option value="">Selecione sua especialidade...</option>
-              {specialtyOptions.map((specialty) => (
-                <option key={specialty} value={specialty}>{specialty}</option>
-              ))}
-            </select>
-          </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
+                <input
+                  type="text"
+                  value={formData.cnpj}
+                  onChange={(e) => handleMaskedInputChange('cnpj', e.target.value, 'cnpj')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
 
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Descrição Profissional
-            </label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={4}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Razão Social</label>
+                <input
+                  type="text"
+                  value={formData.corporateName}
+                  onChange={(e) => handleInputChange('corporateName', e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              placeholder="Descreva brevemente sua experiência e especialidades..."
-              required
             />
           </div>
         </div>
 
-        {/* Location */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <MapPin className="h-5 w-5 mr-2" />
-            Localização
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cidade
-              </label>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nome Fantasia</label>
               <input
                 type="text"
-                value={formData.city || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                value={formData.tradeName}
+                onChange={(e) => handleInputChange('tradeName', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="Sua cidade"
-                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+                <input
+                  type="text"
+                  value={formData.commercialCep}
+                  onChange={(e) => handleMaskedInputChange('commercialCep', e.target.value, 'cep')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  placeholder="00000-000"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
+                <input
+                  type="text"
+                  value={formData.commercialAddress}
+                  onChange={(e) => handleInputChange('commercialAddress', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                <input
+                  type="text"
+                  value={formData.commercialNumber}
+                  onChange={(e) => handleInputChange('commercialNumber', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
+                <input
+                  type="text"
+                  value={formData.commercialComplement}
+                  onChange={(e) => handleInputChange('commercialComplement', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
+                <input
+                  type="text"
+                  value={formData.commercialNeighborhood}
+                  onChange={(e) => handleInputChange('commercialNeighborhood', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                <input
+                  type="text"
+                  value={formData.commercialCity}
+                  onChange={(e) => handleInputChange('commercialCity', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estado
-              </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
               <input
                 type="text"
-                value={formData.state || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                  value={formData.commercialState}
+                  onChange={(e) => handleInputChange('commercialState', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">E-mail comercial</label>
+                <input
+                  type="email"
+                  value={formData.commercialEmail}
+                  onChange={(e) => handleInputChange('commercialEmail', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="Estado (UF)"
-                required
+              />
+              </div>
+            </div>
+          </div>
+        )}
+
+                {/* Interesses Tab */}
+        {activeTab === 'interests' && (
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Especialidades</h2>
+            <p className="text-gray-600 mb-6">Selecione uma opção ou mais!</p>
+            
+            <div className="space-y-6">
+              {/* Primeira linha: Tipo de Serviço e Área de Atuação */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Serviço</label>
+                  {renderSelectField('serviceTypes', 'Selecione o tipo de serviço', ['Costura', 'Bordado', 'Modelagem', 'Alfaiataria'])}
+                  <div className="mt-2">
+                    {formData.serviceTypes.map(tag => renderTag(tag, 'serviceTypes'))}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Área de Atuação</label>
+                  {renderSelectField('operationAreas', 'Selecione a área de atuação', ['Moda Feminina', 'Moda Masculina', 'Moda Infantil', 'Alta Costura'])}
+                  <div className="mt-2">
+                    {formData.operationAreas.map(tag => renderTag(tag, 'operationAreas'))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Segunda linha: Especialidade e Maquinário */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Especialidade</label>
+                  {renderSelectField('specialties', 'Selecione a especialidade', ['Vestidos de Festa', 'Roupas Casuais', 'Uniformes', 'Trajes Sociais'])}
+                  <div className="mt-2">
+                    {formData.specialties.map(tag => renderTag(tag, 'specialties'))}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Maquinário</label>
+                  {renderSelectField('machinery', 'Selecione o maquinário', ['Máquina de Costura', 'Overlock', 'Máquina de Bordar', 'Máquina de Cortar'])}
+                  <div className="mt-2">
+                    {formData.machinery.map(tag => renderTag(tag, 'machinery'))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Terceira linha: Tipo de Tecido (linha única) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Tecido</label>
+                {renderSelectField('fabricTypes', 'Selecione o tipo de tecido', ['Algodão', 'Seda', 'Linho', 'Poliéster', 'Viscose'])}
+                <div className="mt-2">
+                  {formData.fabricTypes.map(tag => renderTag(tag, 'fabricTypes'))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Anos de Experiência</label>
+              <input
+                  type="text"
+                  value={formData.experienceYears}
+                  onChange={(e) => handleInputChange('experienceYears', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacidade de produção diária</label>
+              <input
+                  type="text"
+                  value={formData.dailyProductionCapacity}
+                  onChange={(e) => handleInputChange('dailyProductionCapacity', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Quantidade de produção requerida</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Mínima</label>
+                  <input
+                    type="text"
+                    value={formData.minProductionQuantity}
+                    onChange={(e) => handleInputChange('minProductionQuantity', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Máxima</label>
+              <input
+                    type="text"
+                    value={formData.maxProductionQuantity}
+                    onChange={(e) => handleInputChange('maxProductionQuantity', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
             </div>
           </div>
         </div>
 
-        {/* Services */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <Briefcase className="h-5 w-5 mr-2" />
-            Serviços Oferecidos
-          </h2>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {serviceOptions.map((service) => (
-              <button
-                key={service}
-                type="button"
-                onClick={() => handleServiceToggle(service)}
-                className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
-                  formData.services?.includes(service)
-                    ? 'border-pink-500 bg-pink-50 text-pink-700'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                }`}
-              >
-                {service}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Contact Information */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <Phone className="h-5 w-5 mr-2" />
-            Informações de Contato
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Telefone
-              </label>
-              <input
-                type="tel"
-                value={formData.contact?.phone || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  contact: { ...prev.contact, phone: e.target.value } 
-                }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="(11) 99999-9999"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                WhatsApp
-              </label>
-              <input
-                type="tel"
-                value={formData.contact?.whatsapp || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  contact: { ...prev.contact, whatsapp: e.target.value } 
-                }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="(11) 99999-9999"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Profissional
-              </label>
-              <input
-                type="email"
-                value={formData.contact?.email || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  contact: { ...prev.contact, email: e.target.value } 
-                }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="contato@email.com"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Availability */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <Star className="h-5 w-5 mr-2" />
-            Disponibilidade
-          </h2>
-          
+            <div className="mt-8">
+              <label className="block text-sm font-medium text-gray-700 mb-3">Disponibilidade para Início:</label>
           <div className="space-y-3">
             {[
-              { value: 'available', label: 'Disponível para novos projetos', color: 'green' },
-              { value: 'busy', label: 'Ocupado, mas aceito alguns projetos', color: 'yellow' },
-              { value: 'unavailable', label: 'Indisponível no momento', color: 'red' },
+                  'Imediata',
+                  'Em até 7 dias',
+                  'Em até 15 dias',
+                  'Em até 30 dias',
+                  'A combinar'
             ].map((option) => (
-              <label key={option.value} className="flex items-center space-x-3 cursor-pointer">
+                  <label key={option} className="flex items-center cursor-pointer">
                 <input
                   type="radio"
-                  name="availability"
-                  value={option.value}
-                  checked={formData.availability === option.value}
-                  onChange={(e) => setFormData(prev => ({ ...prev, availability: e.target.value as any }))}
-                  className="w-4 h-4 text-pink-600 border-gray-300 focus:ring-pink-500"
-                />
-                <span className="text-gray-700">{option.label}</span>
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  option.color === 'green' ? 'bg-green-100 text-green-800' :
-                  option.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {option.color === 'green' ? 'Disponível' :
-                   option.color === 'yellow' ? 'Limitado' : 'Indisponível'}
-                </span>
+                      name="availabilityStart"
+                      value={option}
+                      checked={formData.availabilityStart === option}
+                      onChange={(e) => handleInputChange('availabilityStart', e.target.value)}
+                      className="w-4 h-4 text-pink-600 border-gray-300 focus:ring-pink-500 mr-3"
+                    />
+                    {option}
               </label>
             ))}
           </div>
         </div>
+          </div>
+        )}
 
-        {/* Save Button */}
-        <div className="flex justify-end">
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+          <button
+            type="button"
+            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
           <button
             type="submit"
-            className="bg-gradient-to-r from-pink-500 to-pink-600 text-white px-8 py-3 rounded-lg hover:from-pink-600 hover:to-pink-700 transition-all duration-200 font-medium flex items-center"
+            className="px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
           >
-            <Save className="h-5 w-5 mr-2" />
-            Salvar Perfil
+            Salvar
           </button>
         </div>
       </form>

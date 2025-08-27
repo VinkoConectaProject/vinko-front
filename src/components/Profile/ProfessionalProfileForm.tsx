@@ -38,7 +38,7 @@ interface FormData {
   operationAreas: string[];
   specialties: string[];
   machinery: string[];
-  fabricTypes: string[];
+  fabricTypes: string;
   experienceYears: string;
   dailyProductionCapacity: string;
   minProductionQuantity: string;
@@ -82,7 +82,7 @@ export function ProfessionalProfileForm() {
     operationAreas: [],
     specialties: [],
     machinery: [],
-    fabricTypes: [],
+    fabricTypes: '',
     experienceYears: '',
     dailyProductionCapacity: '',
     minProductionQuantity: '',
@@ -428,8 +428,8 @@ export function ProfessionalProfileForm() {
             </label>
                 ))}
               </div>
-            </div>
-            
+          </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
@@ -570,10 +570,10 @@ export function ProfessionalProfileForm() {
                   {renderSelectField('operationAreas', 'Selecione a área de atuação', ['Moda Feminina', 'Moda Masculina', 'Moda Infantil', 'Alta Costura'])}
                   <div className="mt-2">
                     {formData.operationAreas.map(tag => renderTag(tag, 'operationAreas'))}
-                  </div>
-                </div>
-              </div>
-              
+            </div>
+          </div>
+        </div>
+
               {/* Segunda linha: Especialidade e Maquinário */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -590,15 +590,26 @@ export function ProfessionalProfileForm() {
                   <div className="mt-2">
                     {formData.machinery.map(tag => renderTag(tag, 'machinery'))}
                   </div>
-                </div>
-              </div>
-              
+          </div>
+        </div>
+
               {/* Terceira linha: Tipo de Tecido (linha única) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Tecido</label>
-                {renderSelectField('fabricTypes', 'Selecione o tipo de tecido', ['Algodão', 'Seda', 'Linho', 'Poliéster', 'Viscose'])}
-                <div className="mt-2">
-                  {formData.fabricTypes.map(tag => renderTag(tag, 'fabricTypes'))}
+                <label className="block text-sm font-medium text-gray-700 mb-3">Tipo de Tecido</label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {['Plano', 'Malha', 'Ambos'].map((type) => (
+                    <label key={type} className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="fabricTypes"
+                        value={type}
+                        checked={formData.fabricTypes === type}
+                        onChange={(e) => handleInputChange('fabricTypes', e.target.value)}
+                        className="w-4 h-4 text-pink-600 border-gray-300 focus:ring-pink-500 mr-3"
+                      />
+                      {type}
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>

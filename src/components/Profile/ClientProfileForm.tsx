@@ -354,32 +354,32 @@ export function ClientProfileForm() {
                 />
               </div>
               
-              <div>
+            <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
-                <input
-                  type="text"
+              <input
+                type="text"
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
-                <input
-                  type="text"
+              <input
+                type="text"
                   value={formData.state}
                   onChange={(e) => handleInputChange('state', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-              </div>
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
             </div>
           </div>
+        </div>
         )}
 
         {/* Dados Comerciais Tab */}
         {activeTab === 'commercial' && (
-          <div>
+            <div>
             <h2 className="text-xl font-bold text-gray-900 mb-6">Dados da Empresa</h2>
             
             <div className="mb-6">
@@ -406,16 +406,16 @@ export function ClientProfileForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
-                <input
-                  type="text"
+              <input
+                type="text"
                   value={formData.cnpj}
                   onChange={(e) => handleMaskedInputChange('cnpj', e.target.value, 'cnpj')}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   placeholder="00.000.000/0000-00"
-                />
-              </div>
-              
-              <div>
+              />
+            </div>
+
+            <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Razão Social</label>
                 <input
                   type="text"
@@ -476,7 +476,7 @@ export function ClientProfileForm() {
                   onChange={(e) => handleInputChange('commercialComplement', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 />
-              </div>
+          </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
@@ -486,8 +486,8 @@ export function ClientProfileForm() {
                   onChange={(e) => handleInputChange('commercialNeighborhood', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 />
-              </div>
-              
+        </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
                 <input
@@ -498,27 +498,27 @@ export function ClientProfileForm() {
                 />
               </div>
               
-              <div>
+            <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
-                <input
+              <input
                   type="text"
                   value={formData.commercialState}
                   onChange={(e) => handleInputChange('commercialState', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">E-mail comercial</label>
-                <input
-                  type="email"
+              <input
+                type="email"
                   value={formData.commercialEmail}
                   onChange={(e) => handleInputChange('commercialEmail', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-              </div>
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
             </div>
           </div>
+        </div>
         )}
 
         {/* Interesses Tab */}

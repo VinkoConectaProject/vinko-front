@@ -75,9 +75,10 @@ export interface DjangoUser {
   user_type: string; // Agora é uma string: 'CLIENTE' ou 'PROFISSIONAL'
   professional_experience: string | null;
   specialty: string | null;
-  availability: string | null;
+  availability: number | null;
   services: number[];
   services_areas: number[];
+  areas: number[];
   specialties: number[];
   machines: number[];
   tecid_type: string | null;

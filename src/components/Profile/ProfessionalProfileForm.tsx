@@ -83,6 +83,22 @@ export function ProfessionalProfileForm() {
   const [filteredServices, setFilteredServices] = useState<ServiceOption[]>([]);
   const [filteredServiceAreas, setFilteredServiceAreas] = useState<ServiceOption[]>([]);
 
+  // Estado para controlar dropdowns abertos
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+
+  // Fechar dropdowns quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.dropdown-container')) {
+        setOpenDropdowns({});
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [formData, setFormData] = useState<FormData>({
     // Dados Pessoais
     fullName: '',
@@ -160,34 +176,13 @@ export function ProfessionalProfileForm() {
   // Carregar dados do usuário
   const loadUserData = async () => {
     try {
-      console.log('loadUserData started');
       setLoading(true);
       const userId = state.djangoUser?.id;
-      console.log('User ID:', userId);
       if (!userId) {
-        console.log('No user ID, returning');
         return;
       }
 
-      console.log('Calling getUserById...');
       const userData = await userService.getUserById(userId);
-      console.log('User data received:', userData);
-      console.log('User data fields:', {
-        full_name: userData.full_name,
-        cpf: userData.cpf,
-        cellphone: userData.cellphone,
-        email: userData.email,
-        cep: userData.cep,
-        street: userData.street,
-        city: userData.city,
-        state: userData.state
-      });
-      
-      // Verificar todos os campos disponíveis
-      console.log('Todos os campos disponíveis:', Object.keys(userData));
-      console.log('Valores dos campos:', userData);
-      
-      console.log('Loading options...');
       // Carregar opções
       const [services, serviceAreas, specialties, machines, availabilities] = await Promise.all([
         userService.getServices(),
@@ -209,7 +204,7 @@ export function ProfessionalProfileForm() {
       setFilteredServices(services);
       setFilteredServiceAreas(serviceAreas);
 
-      console.log('Mapping user data to form...');
+
       
       // Definir data de última atualização
       if (userData.updated_at) {
@@ -250,7 +245,7 @@ export function ProfessionalProfileForm() {
         operationAreas: [],
         specialties: [],
         machinery: [],
-        fabricTypes: userData.tecid_type || '',
+        fabricTypes: mapTecidTypeFromApi(userData.tecid_type),
         experienceYears: userData.year_experience || '',
         dailyProductionCapacity: userData.daily_production_capacity || '',
         minProductionQuantity: userData.min_required_production || '',
@@ -273,9 +268,9 @@ export function ProfessionalProfileForm() {
         setFormData(prev => ({ ...prev, serviceTypes: serviceNames }));
       }
 
-      if (userData.services_areas && userData.services_areas.length > 0) {
+      if (userData.areas && userData.areas.length > 0) {
         const areaNames = await Promise.all(
-          userData.services_areas.map(async (areaId: number) => {
+          userData.areas.map(async (areaId: number) => {
             try {
               const area = await userService.getServiceAreaById(areaId);
               return area.name;
@@ -349,12 +344,9 @@ export function ProfessionalProfileForm() {
   };
 
   useEffect(() => {
-    console.log('useEffect triggered, state.djangoUser:', state.djangoUser);
     if (state.djangoUser?.id) {
-      console.log('Loading user data for ID:', state.djangoUser.id);
       loadUserData();
     } else {
-      console.log('No user ID found, setting loading to false');
       setLoading(false);
     }
   }, [state.djangoUser?.id]);
@@ -373,9 +365,9 @@ export function ProfessionalProfileForm() {
         const { cleanedAreas } = cleanInvalidSelections(value as string[], newData.operationAreas);
         newData.operationAreas = cleanedAreas;
         // Atualizar lista de serviços baseado nas áreas restantes
-        filterServices(newData.operationAreas);
+        filterServices();
       } else if (field === 'operationAreas') {
-        filterServices(value as string[]);
+        filterServices();
       }
 
       return newData;
@@ -396,9 +388,9 @@ export function ProfessionalProfileForm() {
         const { cleanedAreas } = cleanInvalidSelections(newData.serviceTypes, newData.operationAreas);
         newData.operationAreas = cleanedAreas;
         // Atualizar lista de serviços baseado nas áreas restantes
-        filterServices(newData.operationAreas);
+        filterServices();
       } else if (field === 'operationAreas') {
-        filterServices(newData.operationAreas);
+        filterServices();
       }
 
       return newData;
@@ -425,35 +417,60 @@ export function ProfessionalProfileForm() {
     }
   };
 
-  const filterServices = (selectedAreas: string[]) => {
-    if (selectedAreas.length === 0) {
-      // Se nenhuma área selecionada, mostrar todos os serviços
-      setFilteredServices(options.services);
-    } else {
-      // Filtrar serviços que têm as áreas selecionadas
-      const servicesWithSelectedAreas = options.services.filter(service => 
-        service.areas?.some(area => selectedAreas.includes(area.name))
-      );
-      
-      setFilteredServices(servicesWithSelectedAreas);
-    }
+  const filterServices = () => {
+    // Sempre mostrar todos os serviços, independente das áreas selecionadas
+    // O filtro de áreas já garante que apenas áreas válidas sejam selecionadas
+    setFilteredServices(options.services);
   };
 
   // Função para limpar seleções inválidas
   const cleanInvalidSelections = (selectedServices: string[], selectedAreas: string[]) => {
+    // Se não há serviços selecionados, limpar todas as áreas
+    if (selectedServices.length === 0) {
+      return { cleanedAreas: [] };
+    }
+    
     // Limpar áreas que não pertencem mais aos serviços selecionados
-    const validAreas = selectedServices.length === 0 
-      ? [] 
-      : options.services
-          .filter(service => selectedServices.includes(service.name))
-          .flatMap(service => service.areas || [])
-          .map(area => area.name);
+    const validAreas = options.services
+      .filter(service => selectedServices.includes(service.name))
+      .flatMap(service => service.areas || [])
+      .map(area => area.name);
     
     const cleanedAreas = selectedAreas.filter(area => 
-      validAreas.length === 0 || validAreas.includes(area)
+      validAreas.includes(area)
     );
     
     return { cleanedAreas };
+  };
+
+  // Função para mapear tipo de tecido da API para frontend
+  const mapTecidTypeFromApi = (apiValue: string | null): string => {
+    if (!apiValue) return '';
+    
+    switch (apiValue.toUpperCase()) {
+      case 'PLANO':
+        return 'Plano';
+      case 'MALHA':
+        return 'Malha';
+      case 'AMBOS':
+        return 'Ambos';
+      default:
+        return '';
+    }
+  };
+
+  // Função para mapear tipo de tecido do frontend para API
+  const mapTecidTypeToApi = (frontendValue: string): string => {
+    switch (frontendValue) {
+      case 'Plano':
+        return 'PLANO';
+      case 'Malha':
+        return 'MALHA';
+      case 'Ambos':
+        return 'AMBOS';
+      default:
+        return '';
+    }
   };
 
   // Função para formatar data
@@ -565,12 +582,24 @@ export function ProfessionalProfileForm() {
         company_city: formData.commercialCity,
         company_state: formData.commercialState,
         company_email: formData.commercialEmail,
-        tecid_type: formData.fabricTypes,
+        tecid_type: mapTecidTypeToApi(formData.fabricTypes),
         year_experience: formData.experienceYears,
         daily_production_capacity: formData.dailyProductionCapacity,
         min_required_production: formData.minProductionQuantity,
         max_required_production: formData.maxProductionQuantity,
-        // TODO: Implementar mapeamento de IDs para services, services_areas, specialties, machines, availability
+        services: formData.serviceTypes.map(name => 
+          options.services.find(s => s.name === name)?.id
+        ).filter(id => id !== undefined) as number[],
+        areas: formData.operationAreas.map(name => 
+          options.serviceAreas.find(a => a.name === name)?.id
+        ).filter(id => id !== undefined) as number[],
+        specialties: formData.specialties.map(name => 
+          options.specialties.find(s => s.name === name)?.id
+        ).filter(id => id !== undefined) as number[],
+        machines: formData.machinery.map(name => 
+          options.machines.find(m => m.name === name)?.id
+        ).filter(id => id !== undefined) as number[],
+        availability: options.availabilities.find(a => a.name === formData.availabilityStart)?.id || null,
       };
 
       await userService.updateUserById(userId, updateData);
@@ -597,32 +626,90 @@ export function ProfessionalProfileForm() {
     </div>
   );
 
-  const renderSelectField = (field: keyof FormData, placeholder: string, options: string[]) => (
-    <div className="relative">
-      <select
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent appearance-none bg-white"
-        onChange={(e) => {
-          if (e.target.value) {
-            const currentValues = formData[field] as string[];
-            if (!currentValues.includes(e.target.value)) {
-              handleInputChange(field, [...currentValues, e.target.value]);
+  const renderSelectField = (field: keyof FormData, placeholder: string, options: string[], disabled: boolean = false) => {
+    const currentValues = formData[field] as string[];
+    const isOpen = openDropdowns[field] || false;
+
+    const handleOptionClick = (option: string) => {
+      if (currentValues.includes(option)) {
+        // Se já está selecionado, remove
+        handleInputChange(field, currentValues.filter(value => value !== option));
+      } else {
+        // Se não está selecionado, adiciona
+        handleInputChange(field, [...currentValues, option]);
+      }
+    };
+
+    const toggleDropdown = () => {
+      if (disabled) return;
+      setOpenDropdowns(prev => ({
+        ...prev,
+        [field]: !prev[field]
+      }));
+    };
+
+    return (
+      <div className="relative dropdown-container">
+        <div
+          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent appearance-none ${
+            disabled 
+              ? 'border-gray-200 bg-gray-100 cursor-not-allowed text-gray-400' 
+              : 'border-gray-300 bg-white cursor-pointer focus:ring-pink-500'
+          }`}
+          onClick={toggleDropdown}
+        >
+          <span className={currentValues.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+            {disabled 
+              ? 'Selecione um serviço primeiro' 
+              : currentValues.length === 0 
+                ? placeholder 
+                : `${currentValues.length} selecionado(s)`
             }
-          }
-        }}
-        value=""
-      >
-        <option value="">{placeholder}</option>
-        {options.map(option => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+          </span>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg 
+              className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''} ${
+                disabled ? 'text-gray-300' : 'text-gray-400'
+              }`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+        
+        {isOpen && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {options.map(option => {
+              const isSelected = currentValues.includes(option);
+              return (
+                <div
+                  key={option}
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    isSelected 
+                      ? 'bg-pink-50 text-pink-700 border-l-4 border-pink-500' 
+                      : 'text-gray-700'
+                  }`}
+                  onClick={() => handleOptionClick(option)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{option}</span>
+                    {isSelected && (
+                      <svg className="h-4 w-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   if (!state.djangoUser) {
     return (
@@ -981,7 +1068,7 @@ export function ProfessionalProfileForm() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Área de Atuação</label>
-                  {renderSelectField('operationAreas', 'Selecione a área de atuação', filteredServiceAreas.map(s => s.name))}
+                  {renderSelectField('operationAreas', 'Selecione a área de atuação', filteredServiceAreas.map(s => s.name), formData.serviceTypes.length === 0)}
                   <div className="mt-2">
                     {formData.operationAreas.map(tag => renderTag(tag, 'operationAreas'))}
                   </div>

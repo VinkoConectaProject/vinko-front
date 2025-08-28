@@ -28,38 +28,28 @@ export class UserService extends BaseApiService {
   async getUserById(userId: number): Promise<DjangoUser> {
     // Primeiro tentar a rota específica por ID
     try {
-      console.log('Tentando rota /user/users/{id}/...');
       const response = await this.makeRequest<DjangoUser>(`/user/users/${userId}/`);
-      console.log('Resposta da API:', response);
       // Verificar se a resposta tem estrutura aninhada
       if (response.data && typeof response.data === 'object') {
-        console.log('Estrutura da resposta.data:', response.data);
         // Se a resposta tem user dentro de data, retornar apenas o user
         if (response.data.user) {
-          console.log('Retornando dados do usuário:', response.data.user);
           return response.data.user;
         }
         return response.data;
       } else {
-        console.log('Resposta direta:', response);
         return response;
       }
     } catch (error) {
-      console.log('Rota /user/users/{id}/ falhou, tentando /user/profile/');
       // Se falhar, usar a rota de perfil atual
       const response = await this.makeRequest<DjangoUser>('/user/profile/');
-      console.log('Resposta do perfil:', response);
       // Verificar se a resposta tem estrutura aninhada
       if (response.data && typeof response.data === 'object') {
-        console.log('Estrutura da resposta.data (perfil):', response.data);
         // Se a resposta tem user dentro de data, retornar apenas o user
         if (response.data.user) {
-          console.log('Retornando dados do usuário (perfil):', response.data.user);
           return response.data.user;
         }
         return response.data;
       } else {
-        console.log('Resposta direta (perfil):', response);
         return response;
       }
     }
@@ -95,7 +85,6 @@ export class UserService extends BaseApiService {
   async getServices(): Promise<ServiceOption[]> {
     try {
       const response = await this.makeRequest<ServiceOptionsResponse>('/user/services/');
-      console.log('Resposta serviços:', response);
       // Verificar se a resposta tem estrutura aninhada
       if (response.data && Array.isArray(response.data)) {
         return response.data;
@@ -119,7 +108,6 @@ export class UserService extends BaseApiService {
   async getServiceAreas(): Promise<ServiceOption[]> {
     try {
       const response = await this.makeRequest<ServiceOptionsResponse>('/user/service-areas/');
-      console.log('Resposta áreas:', response);
       // Verificar se a resposta tem estrutura aninhada
       if (response.data && Array.isArray(response.data)) {
         return response.data;

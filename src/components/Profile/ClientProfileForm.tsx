@@ -122,8 +122,6 @@ export function ClientProfileForm() {
     } else {
       dispatch({ type: 'ADD_CLIENT_PROFILE', payload: profileData });
     }
-
-    alert('Perfil salvo com sucesso!');
   };
 
   // Funções de máscara

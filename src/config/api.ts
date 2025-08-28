@@ -14,7 +14,7 @@ export const API_CONFIG = {
     },
     USER: {
       USERS: '/user/users/',
-      USER_BY_ID: '/user/users/id_user/?=', // Nova rota para obter usuário por ID
+      USER_BY_ID: '/user/users/me/', // Rota para obter usuário atual
     }
   }
 };

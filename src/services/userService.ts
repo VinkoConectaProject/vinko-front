@@ -24,11 +24,11 @@ export class UserService extends BaseApiService {
     return response.data;
   }
 
-  // Obter perfil do usuário por ID
-  async getUserById(userId: number): Promise<DjangoUser> {
-    // Primeiro tentar a rota específica por ID
+  // Obter perfil do usuário atual
+  async getUserById(): Promise<DjangoUser> {
+    // Usar a rota /me/ para obter dados do usuário atual
     try {
-      const response = await this.makeRequest<DjangoUser>(`/user/users/${userId}/`);
+      const response = await this.makeRequest<DjangoUser>('/user/users/me/');
       // Verificar se a resposta tem estrutura aninhada
       if (response.data && typeof response.data === 'object') {
         // Se a resposta tem user dentro de data, retornar apenas o user
@@ -40,7 +40,7 @@ export class UserService extends BaseApiService {
         return response;
       }
     } catch (error) {
-      // Se falhar, usar a rota de perfil atual
+      // Se falhar, usar a rota de perfil atual como fallback
       const response = await this.makeRequest<DjangoUser>('/user/profile/');
       // Verificar se a resposta tem estrutura aninhada
       if (response.data && typeof response.data === 'object') {
@@ -58,7 +58,7 @@ export class UserService extends BaseApiService {
   // Atualizar perfil do usuário
   async updateProfile(userData: Partial<DjangoUser>): Promise<{ user: DjangoUser; message: string }> {
     const response = await this.makeRequest<{ user: DjangoUser }>('/user/profile/', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(userData),
     });
     
@@ -70,8 +70,8 @@ export class UserService extends BaseApiService {
 
   // Atualizar perfil do usuário por ID
   async updateUserById(userId: number, userData: Partial<DjangoUser>): Promise<{ user: DjangoUser; message: string }> {
-    const response = await this.makeRequest<{ user: DjangoUser }>(`/user/user/${userId}/`, {
-      method: 'PUT',
+    const response = await this.makeRequest<{ user: DjangoUser }>(`/user/users/${userId}/`, {
+      method: 'PATCH',
       body: JSON.stringify(userData),
     });
     

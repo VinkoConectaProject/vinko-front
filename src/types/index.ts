@@ -76,11 +76,16 @@ export interface DjangoUser {
   professional_experience: string | null;
   specialty: string | null;
   availability: number | null;
+  availability_id: number | null;
   services: number[];
+  services_ids: number[];
   services_areas: number[];
   areas: number[];
+  areas_ids: number[];
   specialties: number[];
+  specialtie_ids: number[];
   machines: number[];
+  machines_ids: number[];
   tecid_type: string | null;
   year_experience: string | null;
   daily_production_capacity: string | null;

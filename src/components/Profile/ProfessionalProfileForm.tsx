@@ -222,6 +222,8 @@ export function ProfessionalProfileForm() {
       // Inicializar opções filtradas
       setFilteredServices(services);
       setFilteredServiceAreas(serviceAreas);
+      
+      // Aplicar filtros será feito após carregar todos os dados
 
 
       
@@ -346,8 +348,33 @@ export function ProfessionalProfileForm() {
 
       // Definir dados originais após carregar todos os dados
       setFormData(prev => {
-        setOriginalFormData({...prev});
-        return prev;
+        const finalData = {...prev};
+        setOriginalFormData(finalData);
+        
+        // Aplicar filtros após carregar todos os dados usando as variáveis locais
+        
+        // Aplicar filtros usando as variáveis locais em vez do estado
+        if (finalData.serviceTypes.length === 0) {
+          setFilteredServiceAreas(serviceAreas);
+        } else {
+          const areasFromSelectedServices = services
+            .filter(service => finalData.serviceTypes.includes(service.name))
+            .flatMap(service => service.areas || []);
+          
+          const uniqueAreas = areasFromSelectedServices.filter((area, index, self) => 
+            index === self.findIndex(a => a.id === area.id)
+          );
+          
+          if (uniqueAreas.length === 0) {
+            setFilteredServiceAreas(serviceAreas);
+          } else {
+            setFilteredServiceAreas(uniqueAreas);
+          }
+        }
+        
+        setFilteredServices(services);
+        
+        return finalData;
       });
 
     } catch (error) {
@@ -690,7 +717,12 @@ export function ProfessionalProfileForm() {
         index === self.findIndex(a => a.id === area.id)
       );
       
-      setFilteredServiceAreas(uniqueAreas);
+      // Se não encontrou áreas para os serviços selecionados, mostrar todas
+      if (uniqueAreas.length === 0) {
+        setFilteredServiceAreas(options.serviceAreas);
+      } else {
+        setFilteredServiceAreas(uniqueAreas);
+      }
     }
   };
 
@@ -1352,9 +1384,9 @@ export function ProfessionalProfileForm() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                   CNPJ {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
-                </label>
+              </label>
               <input
                 type="text"
                   value={formData.cnpj}
@@ -1375,9 +1407,9 @@ export function ProfessionalProfileForm() {
             </div>
 
             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                   Razão Social {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
-                </label>
+              </label>
               <input
                 type="text"
                   value={formData.corporateName}
@@ -1498,9 +1530,9 @@ export function ProfessionalProfileForm() {
               </div>
               
             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                   Bairro {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
-                </label>
+              </label>
               <input
                   type="text"
                   value={formData.commercialNeighborhood}
@@ -1520,9 +1552,9 @@ export function ProfessionalProfileForm() {
             </div>
 
             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                   Cidade {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
-                </label>
+              </label>
               <input
                   type="text"
                   value={formData.commercialCity}
@@ -1542,7 +1574,7 @@ export function ProfessionalProfileForm() {
             </div>
 
             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                   Estado {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
                 </label>
                 <input
@@ -1566,7 +1598,7 @@ export function ProfessionalProfileForm() {
               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   E-mail comercial {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
-                </label>
+              </label>
               <input
                 type="email"
                   value={formData.commercialEmail}
@@ -1597,17 +1629,17 @@ export function ProfessionalProfileForm() {
             <div className="space-y-6">
               {/* Primeira linha: Tipo de Serviço e Área de Atuação */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
+                                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Serviço</label>
-                  {renderSelectField('serviceTypes', 'Selecione o tipo de serviço', filteredServices.map(s => s.name))}
+                  {renderSelectField('serviceTypes', 'Selecione o tipo de serviço', (filteredServices || []).map(s => s.name))}
                   <div className="mt-2">
                     {formData.serviceTypes.map(tag => renderTag(tag, 'serviceTypes'))}
-          </div>
-        </div>
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Área de Atuação</label>
-                  {renderSelectField('operationAreas', 'Selecione a área de atuação', filteredServiceAreas.map(s => s.name), formData.serviceTypes.length === 0)}
+                  {renderSelectField('operationAreas', 'Selecione a área de atuação', (filteredServiceAreas || []).map(s => s.name), formData.serviceTypes.length === 0)}
                   <div className="mt-2">
                     {formData.operationAreas.map(tag => renderTag(tag, 'operationAreas'))}
                   </div>

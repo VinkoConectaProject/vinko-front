@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, X } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { ClientProfile } from '../../types';
+import { Toast } from '../UI/Toast';
+
+import { userService } from '../../services/userService';
 
 type TabType = 'personal' | 'commercial' | 'interests';
+
+interface ServiceOption {
+  id: number;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  areas?: ServiceOption[];
+}
 
 interface FormData {
   // Dados Pessoais
   fullName: string;
+  birthDate: string;
   cpf: string;
   phone: string;
   email: string;
@@ -38,89 +51,594 @@ interface FormData {
 }
 
 export function ClientProfileForm() {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const [activeTab, setActiveTab] = useState<TabType>('personal');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [options, setOptions] = useState<{
+    specialties: ServiceOption[];
+  }>({
+    specialties: [],
+  });
+
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+
+  // Estados para validação e controle
+  const [originalFormData, setOriginalFormData] = useState<FormData | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Estado para controlar dropdowns abertos
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+
+  // Estados para toast
+  const [toast, setToast] = useState<{
+    isVisible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    isVisible: false,
+    message: '',
+    type: 'success'
+  });
+  // Fechar dropdowns quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.dropdown-container')) {
+        setOpenDropdowns({});
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [formData, setFormData] = useState<FormData>({
     // Dados Pessoais
-    fullName: 'Iago Vieira Gama',
+    fullName: '',
+    birthDate: '',
     cpf: '',
-    phone: '(82) 98848-8525',
-    email: 'emailregistrado@gmail.com',
+    phone: '',
+    email: '',
     cep: '',
     address: '',
     number: '',
     complement: '',
     neighborhood: '',
-    city: 'Maceió',
-    state: 'Alagoas',
+    city: '',
+    state: '',
     
     // Dados Comerciais
-    companySize: 'CPF',
+    companySize: '',
     cnpj: '',
     corporateName: '',
     tradeName: '',
     commercialCep: '',
     commercialAddress: '',
-    commercialNumber: 'XXX',
+    commercialNumber: '',
     commercialComplement: '',
     commercialNeighborhood: '',
     commercialCity: '',
     commercialState: '',
-    commercialEmail: 'emailregistrado@gmail.com',
+    commercialEmail: '',
     
     // Interesses
     specialties: [],
   });
 
-  const existingProfile = state.clientProfiles.find(p => p.userId === state.currentUser?.id);
+  // Funções para toast
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({
+      isVisible: true,
+      message,
+      type
+    });
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({
+      ...prev,
+      isVisible: false
+    }));
+  };
+
+  // Função para formatar data
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      const options: Intl.DateTimeFormatOptions = { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      };
+      
+      return date.toLocaleDateString('pt-BR', options);
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return '';
+    }
+  };
+
+  // Função para validar campos obrigatórios
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validações obrigatórias sempre
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Campo obrigatório';
+    }
+
+    if (!formData.birthDate.trim()) {
+      errors.birthDate = 'Campo obrigatório';
+    }
+
+    if (!formData.cpf.trim()) {
+      errors.cpf = 'Campo obrigatório';
+    } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
+      errors.cpf = 'CPF deve ter 11 dígitos';
+    } else if (!validateCpf(formData.cpf)) {
+      errors.cpf = 'CPF inválido';
+    }
+
+    if (!formData.phone.trim()) {
+      errors.phone = 'Campo obrigatório';
+    } else if (formData.phone.replace(/\D/g, '').length < 10) {
+      errors.phone = 'Telefone deve ter pelo menos 10 dígitos';
+    }
+
+    // Validações condicionais para empresas (CNPJ, MEI, LTDA, ME)
+    if (['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize)) {
+      if (!formData.cnpj.trim()) {
+        errors.cnpj = 'Campo obrigatório';
+      } else if (formData.cnpj.replace(/\D/g, '').length !== 14) {
+        errors.cnpj = 'CNPJ deve ter 14 dígitos';
+      } else if (!validateCnpj(formData.cnpj)) {
+        errors.cnpj = 'CNPJ inválido';
+      }
+
+      if (!formData.corporateName.trim()) {
+        errors.corporateName = 'Campo obrigatório';
+      }
+
+      if (!formData.commercialCep.trim()) {
+        errors.commercialCep = 'Campo obrigatório';
+      } else if (formData.commercialCep.replace(/\D/g, '').length !== 8) {
+        errors.commercialCep = 'CEP deve ter 8 dígitos';
+      }
+
+      if (!formData.commercialAddress.trim()) {
+        errors.commercialAddress = 'Campo obrigatório';
+      }
+
+      if (!formData.commercialNumber.trim()) {
+        errors.commercialNumber = 'Campo obrigatório';
+      }
+
+      if (!formData.commercialNeighborhood.trim()) {
+        errors.commercialNeighborhood = 'Campo obrigatório';
+      }
+
+      if (!formData.commercialCity.trim()) {
+        errors.commercialCity = 'Campo obrigatório';
+      }
+
+      if (!formData.commercialState.trim()) {
+        errors.commercialState = 'Campo obrigatório';
+      }
+
+      if (!formData.commercialEmail.trim()) {
+        errors.commercialEmail = 'Campo obrigatório';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.commercialEmail)) {
+        errors.commercialEmail = 'Email comercial deve ser válido';
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Função para validar CPF
+  const validateCpf = (cpf: string): boolean => {
+    const cleanCpf = cpf.replace(/\D/g, '');
+    
+    if (cleanCpf.length !== 11) return false;
+    
+    // Verificar se todos os dígitos são iguais
+    if (/^(\d)\1{10}$/.test(cleanCpf)) return false;
+    
+    // Validar primeiro dígito verificador
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(cleanCpf.charAt(i)) * (10 - i);
+    }
+    let remainder = sum % 11;
+    let digit1 = remainder < 2 ? 0 : 11 - remainder;
+    
+    if (parseInt(cleanCpf.charAt(9)) !== digit1) return false;
+    
+    // Validar segundo dígito verificador
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(cleanCpf.charAt(i)) * (11 - i);
+    }
+    remainder = sum % 11;
+    let digit2 = remainder < 2 ? 0 : 11 - remainder;
+    
+    return parseInt(cleanCpf.charAt(10)) === digit2;
+  };
+
+  // Função para validar CNPJ
+  const validateCnpj = (cnpj: string): boolean => {
+    const cleanCnpj = cnpj.replace(/\D/g, '');
+    
+    if (cleanCnpj.length !== 14) return false;
+    
+    // Verificar se todos os dígitos são iguais
+    if (/^(\d)\1{13}$/.test(cleanCnpj)) return false;
+    
+    // Validar primeiro dígito verificador
+    let sum = 0;
+    const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(cleanCnpj.charAt(i)) * weights1[i];
+    }
+    let remainder = sum % 11;
+    let digit1 = remainder < 2 ? 0 : 11 - remainder;
+    
+    if (parseInt(cleanCnpj.charAt(12)) !== digit1) return false;
+    
+    // Validar segundo dígito verificador
+    sum = 0;
+    const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    for (let i = 0; i < 13; i++) {
+      sum += parseInt(cleanCnpj.charAt(i)) * weights2[i];
+    }
+    remainder = sum % 11;
+    let digit2 = remainder < 2 ? 0 : 11 - remainder;
+    
+    return parseInt(cleanCnpj.charAt(13)) === digit2;
+  };
+
+  // Função para cancelar alterações
+  const handleCancel = () => {
+    if (originalFormData) {
+      setFormData({...originalFormData});
+      setValidationErrors({});
+      setHasChanges(false);
+    }
+  };
+
+  // Função para verificar se um campo comercial deve estar desabilitado
+  const isCommercialFieldDisabled = (): boolean => {
+    return formData.companySize === 'CPF';
+  };
+
+  // Carregar dados do usuário
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const userId = state.djangoUser?.id;
+      if (!userId) {
+        return;
+      }
+
+      const userData = await userService.getUserById();
+      // Carregar opções
+      const [specialties] = await Promise.all([
+        userService.getSpecialties(),
+      ]);
+
+      setOptions({
+        specialties,
+      });
+      
+      // Definir data de última atualização
+      if (userData.updated_at) {
+        setLastUpdated(formatDate(userData.updated_at));
+      }
+      
+      // Mapear dados da API para o formulário
+      const newFormData = {
+        // Dados Pessoais
+        fullName: userData.full_name || '',
+        birthDate: userData.birth_date || '',
+        cpf: formatCpf(userData.cpf || ''),
+        phone: formatPhone(userData.cellphone || ''),
+        email: userData.email || '',
+        cep: formatCep(userData.postal_code || ''),
+        address: userData.street || '',
+        number: userData.number || '',
+        complement: userData.complement || '',
+        neighborhood: userData.neighborhood || '',
+        city: userData.city || '',
+        state: userData.state || '',
+        
+        // Dados Comerciais
+        companySize: userData.company_size || '',
+        cnpj: formatCnpj(userData.cnpj || ''),
+        corporateName: userData.corporate_name || '',
+        tradeName: userData.trade_name || '',
+        commercialCep: formatCep(userData.company_cep || ''),
+        commercialAddress: userData.company_street || '',
+        commercialNumber: userData.company_number || '',
+        commercialComplement: userData.company_complement || '',
+        commercialNeighborhood: userData.company_neighborhood || '',
+        commercialCity: userData.company_city || '',
+        commercialState: userData.company_state || '',
+        commercialEmail: userData.company_email || '',
+        
+        // Interesses
+        specialties: [],
+      };
+
+      setFormData(newFormData);
+
+      // Carregar dados das especialidades (IDs para nomes)
+      if (userData.specialties && userData.specialties.length > 0) {
+        const specialtyNames = await Promise.all(
+          userData.specialties.map(async (specialtyId: number) => {
+            try {
+              const specialty = await userService.getSpecialtyById(specialtyId);
+              return specialty.name;
+            } catch {
+              return `Especialidade ${specialtyId}`;
+            }
+          })
+        );
+        setFormData(prev => ({ ...prev, specialties: specialtyNames }));
+      }
+
+      // Definir dados originais após carregar todos os dados
+      setFormData(prev => {
+        const finalData = {...prev};
+        setOriginalFormData(finalData);
+        return finalData;
+      });
+
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error);
+      
+      let errorMessage = 'Erro ao carregar dados do usuário.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('404')) {
+          errorMessage = 'Rota da API não encontrada. Verifique se o backend está rodando.';
+        } else if (error.message.includes('Unexpected token')) {
+          errorMessage = 'Resposta inválida da API. Verifique se o backend está funcionando.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (existingProfile) {
-      // Carregar dados existentes se houver
-      setFormData(prev => ({
-        ...prev,
-        fullName: existingProfile.name || prev.fullName,
-        city: existingProfile.city || prev.city,
-        state: existingProfile.state || prev.state,
-      }));
+    if (state.djangoUser?.id) {
+      loadUserData();
+    } else {
+      setLoading(false);
     }
-  }, [existingProfile]);
+  }, [state.djangoUser?.id]);
+
+  // Verificar mudanças no formulário
+  useEffect(() => {
+    if (originalFormData) {
+      // Comparar cada campo individualmente para detectar mudanças
+      const hasAnyChanges = Object.keys(formData).some(key => {
+        const formValue = formData[key as keyof FormData];
+        const originalValue = originalFormData[key as keyof FormData];
+        
+        // Para arrays, comparar conteúdo
+        if (Array.isArray(formValue) && Array.isArray(originalValue)) {
+          if (formValue.length !== originalValue.length) return true;
+          return formValue.some((item, index) => item !== originalValue[index]);
+        }
+        
+        // Para strings e outros tipos, comparação direta
+        return formValue !== originalValue;
+      });
+      
+      setHasChanges(hasAnyChanges);
+    }
+  }, [formData, originalFormData]);
+
+  // Funções de formatação
+  const formatCpf = (cpf: string) => {
+    const numbers = cpf.replace(/\D/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+  };
+
+  const formatPhone = (phone: string) => {
+    const numbers = phone.replace(/\D/g, '');
+    if (numbers.length === 0) return '';
+    if (numbers.length <= 2) return `(${numbers}`;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const formatCep = (cep: string) => {
+    const numbers = cep.replace(/\D/g, '');
+    if (numbers.length <= 5) return numbers;
+    return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
+  };
+
+  const formatCnpj = (cnpj: string) => {
+    const numbers = cnpj.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+    if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+    if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+  };
+
+  // Função para buscar endereço pelo CEP
+  const fetchAddressByCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          city: data.localidade || '',
+          state: data.uf || '',
+          address: data.logradouro || '',
+          neighborhood: data.bairro || '',
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+    }
+  };
+
+  // Função para buscar endereço comercial pelo CEP
+  const fetchCommercialAddressByCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          commercialCity: data.localidade || '',
+          commercialState: data.uf || '',
+          commercialAddress: data.logradouro || '',
+          commercialNeighborhood: data.bairro || '',
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP comercial:', error);
+    }
+  };
 
   const handleInputChange = (field: keyof FormData, value: string | string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    // Limpar erro do campo quando o usuário começa a digitar
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+
+      // Limpar campos de empresa quando CPF for selecionado
+      if (field === 'companySize' && value === 'CPF') {
+        newData.cnpj = '';
+        newData.corporateName = '';
+        newData.tradeName = '';
+        newData.commercialCep = '';
+        newData.commercialAddress = '';
+        newData.commercialNumber = '';
+        newData.commercialComplement = '';
+        newData.commercialNeighborhood = '';
+        newData.commercialCity = '';
+        newData.commercialState = '';
+        newData.commercialEmail = '';
+      }
+
+      return newData;
+    });
   };
 
   const handleTagRemove = (field: keyof FormData, tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: (prev[field] as string[]).filter(tag => tag !== tagToRemove)
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: (prev[field] as string[]).filter(tag => tag !== tagToRemove)
+      };
+
+      return newData;
+    });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const profileData: ClientProfile = {
-      id: existingProfile?.id || Date.now().toString(),
-      userId: state.currentUser?.id || '',
-      name: formData.fullName || '',
-      company: formData.corporateName || '',
-      city: formData.city || '',
-      state: formData.state || '',
-      contact: {
-        phone: formData.phone || '',
-        email: formData.email || '',
-      },
-      createdAt: existingProfile?.createdAt || new Date(),
-    };
+    // Validar formulário antes de enviar
+    if (!validateForm()) {
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      const userId = state.djangoUser?.id;
+      if (!userId) return;
 
-    if (existingProfile) {
-      dispatch({ type: 'UPDATE_CLIENT_PROFILE', payload: profileData });
-    } else {
-      dispatch({ type: 'ADD_CLIENT_PROFILE', payload: profileData });
+      // Preparar dados para enviar à API
+      const updateData = {
+        full_name: formData.fullName,
+        birth_date: formData.birthDate,
+        cpf: formData.cpf.replace(/\D/g, ''),
+        cellphone: formData.phone.replace(/\D/g, ''),
+        email: formData.email,
+        postal_code: formData.cep.replace(/\D/g, ''),
+        street: formData.address,
+        number: formData.number,
+        complement: formData.complement,
+        neighborhood: formData.neighborhood,
+        city: formData.city,
+        state: formData.state,
+        company_size: formData.companySize,
+        cnpj: formData.cnpj.replace(/\D/g, ''),
+        corporate_name: formData.corporateName,
+        trade_name: formData.tradeName,
+        company_cep: formData.commercialCep.replace(/\D/g, ''),
+        company_street: formData.commercialAddress,
+        company_number: formData.commercialNumber,
+        company_complement: formData.commercialComplement,
+        company_neighborhood: formData.commercialNeighborhood,
+        company_city: formData.commercialCity,
+        company_state: formData.commercialState,
+        company_email: formData.commercialEmail,
+        specialties_ids: formData.specialties.map(name => 
+          options.specialties.find(s => s.name === name)?.id
+        ).filter(id => id !== undefined) as number[],
+      };
+
+      await userService.updateUserById(userId, updateData);
+      
+      // Atualizar dados originais após salvar com sucesso
+      setOriginalFormData({...formData});
+      setHasChanges(false);
+      setValidationErrors({});
+      
+      // Atualizar data de última atualização
+      const now = new Date();
+      const formattedDate = formatDate(now.toISOString());
+      setLastUpdated(formattedDate);
+      
+      // Mostrar toast de sucesso
+      showToast('Perfil salvo com sucesso!', 'success');
+      
+    } catch (error) {
+      console.error('Erro ao salvar perfil:', error);
+      showToast('Erro ao salvar perfil. Tente novamente.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -157,6 +675,15 @@ export function ClientProfileForm() {
   };
 
   const handleMaskedInputChange = (field: keyof FormData, value: string, maskType: 'phone' | 'cep' | 'cpf' | 'cnpj') => {
+    // Limpar erro do campo quando o usuário começa a digitar
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+
     let maskedValue = value;
     
     switch (maskType) {
@@ -178,6 +705,20 @@ export function ClientProfileForm() {
       ...prev,
       [field]: maskedValue
     }));
+
+    // Buscar endereço automaticamente quando CEP é alterado
+    if (maskType === 'cep') {
+      const cleanCep = maskedValue.replace(/\D/g, '');
+      
+      // Verificar se o CEP está completo (8 dígitos) ou se tem a máscara completa (9 caracteres)
+      if (cleanCep.length === 8 || maskedValue.length === 9) {
+        if (field === 'cep') {
+          fetchAddressByCep(maskedValue);
+        } else if (field === 'commercialCep') {
+          fetchCommercialAddressByCep(maskedValue);
+        }
+      }
+    }
   };
 
   const renderTag = (tag: string, field: keyof FormData) => (
@@ -193,41 +734,138 @@ export function ClientProfileForm() {
     </div>
   );
 
-  const renderSelectField = (field: keyof FormData, placeholder: string, options: string[]) => (
-    <div className="relative">
-      <select
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent appearance-none bg-white"
-        onChange={(e) => {
-          if (e.target.value) {
-            const currentValues = formData[field] as string[];
-            if (!currentValues.includes(e.target.value)) {
-              handleInputChange(field, [...currentValues, e.target.value]);
+  const renderSelectField = (field: keyof FormData, placeholder: string, options: string[], disabled: boolean = false) => {
+    const currentValues = formData[field] as string[];
+    const isOpen = openDropdowns[field] || false;
+
+    const handleOptionClick = (option: string) => {
+      if (currentValues.includes(option)) {
+        // Se já está selecionado, remove
+        handleInputChange(field, currentValues.filter(value => value !== option));
+      } else {
+        // Se não está selecionado, adiciona
+        handleInputChange(field, [...currentValues, option]);
+      }
+    };
+
+    const toggleDropdown = () => {
+      if (disabled) return;
+      setOpenDropdowns(prev => ({
+        ...prev,
+        [field]: !prev[field]
+      }));
+    };
+
+    return (
+      <div className="relative dropdown-container">
+        <div
+          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent appearance-none ${
+            disabled 
+              ? 'border-gray-200 bg-gray-100 cursor-not-allowed text-gray-400' 
+              : 'border-gray-300 bg-white cursor-pointer focus:ring-pink-500'
+          }`}
+          onClick={toggleDropdown}
+        >
+          <span className={currentValues.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+            {disabled 
+              ? 'Selecione um serviço primeiro' 
+              : currentValues.length === 0 
+                ? placeholder 
+                : `${currentValues.length} selecionado(s)`
             }
-          }
-        }}
-        value=""
-      >
-        <option value="">{placeholder}</option>
-        {options.map(option => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+          </span>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg 
+              className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''} ${
+                disabled ? 'text-gray-300' : 'text-gray-400'
+              }`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+        
+        {isOpen && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {options.map(option => {
+              const isSelected = currentValues.includes(option);
+              return (
+                <div
+                  key={option}
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    isSelected 
+                      ? 'bg-pink-50 text-pink-700 border-l-4 border-pink-500' 
+                      : 'text-gray-700'
+                  }`}
+                  onClick={() => handleOptionClick(option)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{option}</span>
+                    {isSelected && (
+                      <svg className="h-4 w-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  if (!state.djangoUser) {
+    return (
+      <div className="w-full py-8 flex justify-center items-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-2">Usuário não autenticado</div>
+          <div className="text-gray-600">Faça login para acessar seu perfil</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full py-8 flex justify-center items-center">
+        <div className="text-gray-600">Carregando dados do perfil...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full py-8 flex justify-center items-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-2">Erro ao carregar perfil</div>
+          <div className="text-gray-600">{error}</div>
+          <button 
+            onClick={() => {
+              setError(null);
+              loadUserData();
+            }}
+            className="mt-4 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Empresa Nome - Cliente / Marca</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{formData.fullName || state.djangoUser?.full_name || 'Usuário'} - Cliente / Marca</h1>
         <div className="flex items-center text-gray-500 text-sm">
           <Calendar className="h-4 w-4 mr-2" />
-          Última atualização em 22 de Abril
+          {lastUpdated ? `Última atualização em ${lastUpdated}` : 'Carregando...'}
         </div>
       </div>
 
@@ -260,35 +898,89 @@ export function ClientProfileForm() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nome Completo <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
+                  name="fullName"
+                  data-field="fullName"
                   value={formData.fullName}
                   onChange={(e) => handleInputChange('fullName', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    validationErrors.fullName 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
+                {validationErrors.fullName && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.fullName}</p>
+                )}
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data de Nascimento <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="birthDate"
+                  data-field="birthDate"
+                  value={formData.birthDate}
+                  onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    validationErrors.birthDate 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:ring-pink-500'
+                  }`}
+                />
+                {validationErrors.birthDate && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.birthDate}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  CPF <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
+                  name="cpf"
+                  data-field="cpf"
                   value={formData.cpf}
                   onChange={(e) => handleMaskedInputChange('cpf', e.target.value, 'cpf')}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    validationErrors.cpf 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                   placeholder="000.000.000-00"
                 />
+                {validationErrors.cpf && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.cpf}</p>
+                )}
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Telefone <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
+                  name="phone"
+                  data-field="phone"
                   value={formData.phone}
                   onChange={(e) => handleMaskedInputChange('phone', e.target.value, 'phone')}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    validationErrors.phone 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                   placeholder="(00) 00000-0000"
                 />
+                {validationErrors.phone && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
+                )}
               </div>
               
               <div>
@@ -296,8 +988,8 @@ export function ClientProfileForm() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
                 />
               </div>
               
@@ -403,117 +1095,237 @@ export function ClientProfileForm() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
-              <input
-                type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  CNPJ {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="text"
                   value={formData.cnpj}
                   onChange={(e) => handleMaskedInputChange('cnpj', e.target.value, 'cnpj')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.cnpj 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                   placeholder="00.000.000/0000-00"
-              />
-            </div>
+                />
+                {validationErrors.cnpj && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.cnpj}</p>
+                )}
+              </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Razão Social</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Razão Social {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={formData.corporateName}
                   onChange={(e) => handleInputChange('corporateName', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.corporateName 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
+                {validationErrors.corporateName && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.corporateName}</p>
+                )}
               </div>
             </div>
             
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nome Fantasia</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome Fantasia {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-gray-500">(opcional)</span>}
+              </label>
               <input
                 type="text"
                 value={formData.tradeName}
                 onChange={(e) => handleInputChange('tradeName', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                disabled={isCommercialFieldDisabled()}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                  isCommercialFieldDisabled()
+                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-300 focus:ring-pink-500'
+                }`}
               />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  CEP {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={formData.commercialCep}
                   onChange={(e) => handleMaskedInputChange('commercialCep', e.target.value, 'cep')}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialCep 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                   placeholder="00000-000"
                 />
+                {validationErrors.commercialCep && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialCep}</p>
+                )}
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Endereço {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={formData.commercialAddress}
                   onChange={(e) => handleInputChange('commercialAddress', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialAddress 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
+                {validationErrors.commercialAddress && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialAddress}</p>
+                )}
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Número {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={formData.commercialNumber}
                   onChange={(e) => handleInputChange('commercialNumber', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialNumber 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
+                {validationErrors.commercialNumber && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialNumber}</p>
+                )}
               </div>
               
-              <div>
+                            <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
                 <input
                   type="text"
                   value={formData.commercialComplement}
                   onChange={(e) => handleInputChange('commercialComplement', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
-          </div>
+              </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Bairro {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={formData.commercialNeighborhood}
                   onChange={(e) => handleInputChange('commercialNeighborhood', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialNeighborhood 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
-        </div>
+                {validationErrors.commercialNeighborhood && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialNeighborhood}</p>
+                )}
+              </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cidade {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
                   value={formData.commercialCity}
                   onChange={(e) => handleInputChange('commercialCity', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialCity 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
                 />
+                {validationErrors.commercialCity && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialCity}</p>
+                )}
               </div>
               
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
-              <input
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estado {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
+                <input
                   type="text"
                   value={formData.commercialState}
                   onChange={(e) => handleInputChange('commercialState', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              />
-            </div>
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialState 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
+                />
+                {validationErrors.commercialState && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialState}</p>
+                )}
+              </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">E-mail comercial</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                E-mail comercial {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+              </label>
               <input
                 type="email"
-                  value={formData.commercialEmail}
-                  onChange={(e) => handleInputChange('commercialEmail', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                value={formData.commercialEmail}
+                onChange={(e) => handleInputChange('commercialEmail', e.target.value)}
+                disabled={isCommercialFieldDisabled()}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                  isCommercialFieldDisabled()
+                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : validationErrors.commercialEmail 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:ring-pink-500'
+                }`}
               />
+              {validationErrors.commercialEmail && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.commercialEmail}</p>
+              )}
             </div>
           </div>
         </div>
@@ -529,7 +1341,7 @@ export function ClientProfileForm() {
               {/* Campo único: Especialidades */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades</label>
-                {renderSelectField('specialties', 'Selecione as especialidades', ['Moda Feminina', 'Moda Masculina', 'Moda Infantil', 'Alta Costura', 'Vestidos de Festa', 'Roupas Casuais'])}
+                {renderSelectField('specialties', 'Selecione as especialidades', options.specialties.map(s => s.name))}
                 <div className="mt-2">
                   {formData.specialties.map(tag => renderTag(tag, 'specialties'))}
                 </div>
@@ -542,18 +1354,29 @@ export function ClientProfileForm() {
         <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
           <button
             type="button"
-            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            onClick={handleCancel}
+            disabled={!hasChanges}
+            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
+            disabled={saving || !hasChanges}
+            className="px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Salvar
+            {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </form>
+      
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }

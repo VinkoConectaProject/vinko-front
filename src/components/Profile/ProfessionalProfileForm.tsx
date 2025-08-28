@@ -978,7 +978,7 @@ export function ProfessionalProfileForm() {
         areas_ids: formData.operationAreas.map(name => 
           options.serviceAreas.find(a => a.name === name)?.id
         ).filter(id => id !== undefined) as number[],
-        specialtie_ids: formData.specialties.map(name => 
+        specialties_ids: formData.specialties.map(name => 
           options.specialties.find(s => s.name === name)?.id
         ).filter(id => id !== undefined) as number[],
         machines_ids: formData.machinery.map(name => 

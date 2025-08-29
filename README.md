@@ -42,12 +42,4 @@ npm run preview
 | `npm run dev` | Inicia servidor de desenvolvimento |
 | `npm run build` | Cria build de produção |
 | `npm run preview` | Visualiza build de produção |
-| `npm run lint` | Verifica qualidade do código |
-
-## 🔧 Configuração
-
-Crie um arquivo `.env` na raiz:
-```env
-VITE_API_BASE_URL=http://localhost:8000/api
-VITE_APP_NAME=Vinko
-``` 
+| `npm run lint` | Verifica qualidade do código | 

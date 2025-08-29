@@ -14,7 +14,7 @@ import { AdminDashboard } from './components/Admin/AdminDashboard';
 import { ProfessionalProfileForm } from './components/Profile/ProfessionalProfileForm';
 import { ClientProfileForm } from './components/Profile/ClientProfileForm';
 import OpportunitiesPage from './components/Opportunities/OpportunitiesPage';
-import { FindProfessionalsPage } from './components/Professionals/FindProfessionalsPage';
+import { SearchProfessionalsPage } from './components/Professionals/SearchProfessionalsPage';
 import { MyDemandsPage } from './components/Demands/MyDemandsPage';
 import { MyJobsPage } from './components/Jobs/MyJobsPage';
 import { NotificationsPage } from './components/Notifications/NotificationsPage';
@@ -330,7 +330,7 @@ function AppContent() {
         case 'profile':
           return <ClientProfileForm />;
         case 'find-professionals':
-          return <FindProfessionalsPage onStartConversation={startConversation} />;
+          return <SearchProfessionalsPage />;
         case 'my-demands':
           return (
             <MyDemandsPage 

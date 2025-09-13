@@ -20,6 +20,7 @@ import {
   Award
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { BRAZILIAN_STATES } from '../../data/locations';
 import { Demand, ProfessionalProfile, Rating } from '../../types';
 
 interface MyDemandsPageProps {
@@ -44,7 +45,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
     budgetMin: '',
     budgetMax: '',
     city: '',
-    state: '',
+    uf: '',
     isRemote: false,
   });
 
@@ -80,7 +81,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
       },
       location: {
         city: formData.city,
-        state: formData.state,
+        state: formData.uf,
         isRemote: formData.isRemote,
       },
       status: 'open',
@@ -100,7 +101,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
       budgetMin: '',
       budgetMax: '',
       city: '',
-      state: '',
+      uf: '',
       isRemote: false,
     });
   };
@@ -697,16 +698,21 @@ function CreateDemandModal({ formData, setFormData, onSubmit, onClose }: CreateD
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estado
+                Estado (UF)
               </label>
-              <input
-                type="text"
-                value={formData.state}
-                onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+              <select
+                value={formData.uf}
+                onChange={(e) => setFormData(prev => ({ ...prev, uf: e.target.value }))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="SP"
                 required
-              />
+              >
+                <option value="">Selecione o estado</option>
+                {BRAZILIAN_STATES.map(state => (
+                  <option key={state.code} value={state.code}>
+                    {state.code}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="md:col-span-2">
@@ -982,7 +988,7 @@ function ProfessionalCard({ professional, isSelected, onSelect, onContact, onSta
       <div className="text-xs text-gray-500 mb-3">
         <div className="flex items-center mb-1">
           <MapPin className="h-3 w-3 mr-1" />
-          {professional.city}, {professional.state}
+          {professional.city}, {professional.uf}
         </div>
         {professional.contact.phone && (
           <div className="flex items-center">

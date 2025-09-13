@@ -4,6 +4,8 @@ import { useApp } from '../../contexts/AppContext';
 import { Toast } from '../UI/Toast';
 
 import { userService } from '../../services/userService';
+import { BRAZILIAN_STATES } from '../../data/locations';
+import { LocationService } from '../../services/locationService';
 
 type TabType = 'personal' | 'commercial' | 'interests';
 
@@ -30,7 +32,7 @@ interface FormData {
   complement: string;
   neighborhood: string;
   city: string;
-  state: string;
+  uf: string;
   
   // Dados Comerciais
   companySize: string;
@@ -43,7 +45,7 @@ interface FormData {
   commercialComplement: string;
   commercialNeighborhood: string;
   commercialCity: string;
-  commercialState: string;
+  commercialUf: string;
   commercialEmail: string;
   
   // Interesses
@@ -60,6 +62,16 @@ export function ClientProfileForm() {
     specialties: ServiceOption[];
   }>({
     specialties: [],
+  });
+
+  // Estados para cidades
+  const [cities, setCities] = useState<{ [key: string]: { id: number; nome: string }[] }>({
+    personal: [],
+    commercial: [],
+  });
+  const [loadingCities, setLoadingCities] = useState<{ [key: string]: boolean }>({
+    personal: false,
+    commercial: false,
   });
 
   const [lastUpdated, setLastUpdated] = useState<string>('');
@@ -108,7 +120,7 @@ export function ClientProfileForm() {
     complement: '',
     neighborhood: '',
     city: '',
-    state: '',
+    uf: '',
     
     // Dados Comerciais
     companySize: '',
@@ -121,7 +133,7 @@ export function ClientProfileForm() {
     commercialComplement: '',
     commercialNeighborhood: '',
     commercialCity: '',
-    commercialState: '',
+    commercialUf: '',
     commercialEmail: '',
     
     // Interesses
@@ -226,8 +238,8 @@ export function ClientProfileForm() {
         errors.commercialCity = 'Campo obrigatório';
       }
 
-      if (!formData.commercialState.trim()) {
-        errors.commercialState = 'Campo obrigatório';
+      if (!formData.commercialUf.trim()) {
+        errors.commercialUf = 'Campo obrigatório';
       }
 
       if (!formData.commercialEmail.trim()) {
@@ -355,7 +367,7 @@ export function ClientProfileForm() {
         complement: userData.complement || '',
         neighborhood: userData.neighborhood || '',
         city: userData.city || '',
-        state: userData.state || '',
+        uf: userData.uf || '',
         
         // Dados Comerciais
         companySize: userData.company_size || '',
@@ -368,7 +380,7 @@ export function ClientProfileForm() {
         commercialComplement: userData.company_complement || '',
         commercialNeighborhood: userData.company_neighborhood || '',
         commercialCity: userData.company_city || '',
-        commercialState: userData.company_state || '',
+        commercialUf: userData.company_uf || '',
         commercialEmail: userData.company_email || '',
         
         // Interesses
@@ -390,6 +402,14 @@ export function ClientProfileForm() {
           })
         );
         setFormData(prev => ({ ...prev, specialties: specialtyNames }));
+      }
+
+      // Carregar cidades se os estados já estiverem preenchidos
+      if (newFormData.uf) {
+        await loadCitiesByState(newFormData.uf, 'personal');
+      }
+      if (newFormData.commercialUf) {
+        await loadCitiesByState(newFormData.commercialUf, 'commercial');
       }
 
       // Definir dados originais após carregar todos os dados
@@ -493,10 +513,16 @@ export function ClientProfileForm() {
       const data = await response.json();
 
       if (!data.erro) {
+        // Primeiro carregar as cidades do estado
+        if (data.uf) {
+          await loadCitiesByState(data.uf, 'personal');
+        }
+
+        // Depois atualizar os dados do formulário
         setFormData(prev => ({
           ...prev,
           city: data.localidade || '',
-          state: data.uf || '',
+          uf: data.uf || '',
           address: data.logradouro || '',
           neighborhood: data.bairro || '',
         }));
@@ -516,16 +542,42 @@ export function ClientProfileForm() {
       const data = await response.json();
 
       if (!data.erro) {
+        // Primeiro carregar as cidades do estado
+        if (data.uf) {
+          await loadCitiesByState(data.uf, 'commercial');
+        }
+
+        // Depois atualizar os dados do formulário
         setFormData(prev => ({
           ...prev,
           commercialCity: data.localidade || '',
-          commercialState: data.uf || '',
+          commercialUf: data.uf || '',
           commercialAddress: data.logradouro || '',
           commercialNeighborhood: data.bairro || '',
         }));
       }
     } catch (error) {
       console.error('Erro ao buscar CEP comercial:', error);
+    }
+  };
+
+  // Função para carregar cidades baseado no estado selecionado
+  const loadCitiesByState = async (stateCode: string, type: 'personal' | 'commercial') => {
+    if (!stateCode) {
+      setCities(prev => ({ ...prev, [type]: [] }));
+      return;
+    }
+
+    setLoadingCities(prev => ({ ...prev, [type]: true }));
+    
+    try {
+      const citiesData = await LocationService.getCitiesByState(stateCode);
+      setCities(prev => ({ ...prev, [type]: citiesData }));
+    } catch (error) {
+      console.error(`Erro ao carregar cidades do estado ${stateCode}:`, error);
+      setCities(prev => ({ ...prev, [type]: [] }));
+    } finally {
+      setLoadingCities(prev => ({ ...prev, [type]: false }));
     }
   };
 
@@ -556,8 +608,17 @@ export function ClientProfileForm() {
         newData.commercialComplement = '';
         newData.commercialNeighborhood = '';
         newData.commercialCity = '';
-        newData.commercialState = '';
+        newData.commercialUf = '';
         newData.commercialEmail = '';
+      }
+
+      // Carregar cidades quando estado for alterado
+      if (field === 'uf' && typeof value === 'string') {
+        loadCitiesByState(value, 'personal');
+        newData.city = ''; // Limpar cidade quando estado mudar
+      } else if (field === 'commercialUf' && typeof value === 'string') {
+        loadCitiesByState(value, 'commercial');
+        newData.commercialCity = ''; // Limpar cidade comercial quando estado mudar
       }
 
       return newData;
@@ -601,7 +662,7 @@ export function ClientProfileForm() {
         complement: formData.complement,
         neighborhood: formData.neighborhood,
         city: formData.city,
-        state: formData.state,
+        uf: formData.uf,
         company_size: formData.companySize,
         cnpj: formData.cnpj.replace(/\D/g, ''),
         corporate_name: formData.corporateName,
@@ -612,7 +673,7 @@ export function ClientProfileForm() {
         company_complement: formData.commercialComplement,
         company_neighborhood: formData.commercialNeighborhood,
         company_city: formData.commercialCity,
-        company_state: formData.commercialState,
+        company_uf: formData.commercialUf,
         company_email: formData.commercialEmail,
         specialties_ids: formData.specialties.map(name => 
           options.specialties.find(s => s.name === name)?.id
@@ -1045,23 +1106,40 @@ export function ClientProfileForm() {
               </div>
               
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
-              <input
-                type="text"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estado (UF)</label>
+              <select
+                value={formData.uf}
+                onChange={(e) => handleInputChange('uf', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              />
+              >
+                <option value="">Selecione o estado</option>
+                {BRAZILIAN_STATES.map(state => (
+                  <option key={state.code} value={state.code}>
+                    {state.code}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
-              <input
-                type="text"
-                  value={formData.state}
-                  onChange={(e) => handleInputChange('state', e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+              <select
+                value={formData.city}
+                onChange={(e) => handleInputChange('city', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              />
+                disabled={!formData.uf || loadingCities.personal}
+              >
+                <option value="">
+                  {!formData.uf ? 'Primeiro selecione o estado' : 
+                   loadingCities.personal ? 'Carregando cidades...' : 
+                   'Selecione a cidade'}
+                </option>
+                {cities.personal.map(city => (
+                  <option key={city.id} value={city.nome}>
+                    {city.nome}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -1264,13 +1342,40 @@ export function ClientProfileForm() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estado (UF) {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
+                </label>
+                <select
+                  value={formData.commercialUf}
+                  onChange={(e) => handleInputChange('commercialUf', e.target.value)}
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.commercialUf 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
+                >
+                  <option value="">Selecione o estado</option>
+                  {BRAZILIAN_STATES.map(state => (
+                    <option key={state.code} value={state.code}>
+                      {state.code}
+                    </option>
+                  ))}
+                </select>
+                {validationErrors.commercialUf && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialUf}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Cidade {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.commercialCity}
                   onChange={(e) => handleInputChange('commercialCity', e.target.value)}
-                  disabled={isCommercialFieldDisabled()}
+                  disabled={isCommercialFieldDisabled() || !formData.commercialUf || loadingCities.commercial}
                   className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
                     isCommercialFieldDisabled()
                       ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -1278,31 +1383,21 @@ export function ClientProfileForm() {
                         ? 'border-red-500 focus:ring-red-500' 
                         : 'border-gray-300 focus:ring-pink-500'
                   }`}
-                />
+                >
+                  <option value="">
+                    {isCommercialFieldDisabled() ? 'Campo desabilitado' :
+                     !formData.commercialUf ? 'Primeiro selecione o estado' : 
+                     loadingCities.commercial ? 'Carregando cidades...' : 
+                     'Selecione a cidade'}
+                  </option>
+                  {cities.commercial.map(city => (
+                    <option key={city.id} value={city.nome}>
+                      {city.nome}
+                    </option>
+                  ))}
+                </select>
                 {validationErrors.commercialCity && (
                   <p className="text-red-500 text-sm mt-1">{validationErrors.commercialCity}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Estado {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="text"
-                  value={formData.commercialState}
-                  onChange={(e) => handleInputChange('commercialState', e.target.value)}
-                  disabled={isCommercialFieldDisabled()}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
-                    isCommercialFieldDisabled()
-                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : validationErrors.commercialState 
-                        ? 'border-red-500 focus:ring-red-500' 
-                        : 'border-gray-300 focus:ring-pink-500'
-                  }`}
-                />
-                {validationErrors.commercialState && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.commercialState}</p>
                 )}
               </div>
 

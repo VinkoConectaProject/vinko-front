@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ChevronDown, X, Scissors, Shirt, Calendar, MapPin, Phone, Mail, Target, Star, Layers } from 'lucide-react';
 import { userService } from '../../services/userService';
+import { BRAZILIAN_STATES } from '../../data/locations';
+import { LocationService } from '../../services/locationService';
 
 interface ServiceOption {
   id: number;
@@ -12,26 +14,15 @@ interface ServiceOption {
   areas?: ServiceOption[];
 }
 
-interface State {
-  id: number;
-  nome: string;
-  sigla: string;
-}
-
-interface City {
-  id: number;
-  nome: string;
-  estado: State;
-}
 
 interface SearchFilters {
   serviceTypes: number[];
   operationAreas: number[];
-  specialties: number[];
+  specialties: string[];
   fabricTypes: string;
   availabilities: number[];
   cities: string[];
-  states: string[];
+  ufs: string[];
 }
 
 interface Professional {
@@ -41,7 +32,7 @@ interface Professional {
   specialties: string[];
   tecid_type: string;
   availability: number;
-  state: string;
+  uf: string;
   city: string;
   email: string;
 }
@@ -62,7 +53,7 @@ export function SearchProfessionalsPage() {
     fabricTypes: '',
     availabilities: [],
     cities: [],
-    states: []
+    ufs: []
   });
 
   const [options, setOptions] = useState<{
@@ -70,22 +61,20 @@ export function SearchProfessionalsPage() {
     serviceAreas: ServiceOption[];
     specialties: ServiceOption[];
     availabilities: ServiceOption[];
-    states: State[];
+    ufs: { code: string; name: string }[];
     cities: City[];
   }>({
     services: [],
     serviceAreas: [],
     specialties: [],
     availabilities: [],
-    states: [],
+    ufs: [],
     cities: []
   });
 
   const [loading, setLoading] = useState(true);
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   
-  // Cache para estados e cidades
-  const [citiesCache, setCitiesCache] = useState<Record<number, City[]>>({});
   const [statesLoaded, setStatesLoaded] = useState(false);
 
   // Estados para busca de profissionais
@@ -119,8 +108,8 @@ export function SearchProfessionalsPage() {
       if (filters.availabilities.length > 0) {
         params.append('availabilities', filters.availabilities.join(','));
       }
-      if (filters.states.length > 0) {
-        params.append('states', filters.states.join(','));
+      if (filters.ufs.length > 0) {
+        params.append('ufs', filters.ufs.join(','));
       }
       if (filters.cities.length > 0) {
         params.append('cities', filters.cities.join(','));
@@ -183,99 +172,37 @@ export function SearchProfessionalsPage() {
     loadOptions();
   }, []);
 
-  // Carregar estados do Brasil (apenas uma vez)
+  // Carregar estados do Brasil (usando dados locais)
   useEffect(() => {
-    const loadStates = async () => {
-      // Verificar se já temos estados no localStorage
-      const cachedStates = localStorage.getItem('vinko_states');
-      if (cachedStates) {
-        try {
-          const statesData = JSON.parse(cachedStates);
-          setOptions(prev => ({ ...prev, states: statesData }));
-          setStatesLoaded(true);
-          return;
-        } catch (error) {
-          console.error('Erro ao carregar estados do cache:', error);
-        }
-      }
+    setOptions(prev => ({ ...prev, ufs: BRAZILIAN_STATES }));
+    setStatesLoaded(true);
+  }, []);
 
-      try {
-        const statesResponse = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados');
-        const statesData: State[] = await statesResponse.json();
-        const sortedStates = statesData.sort((a, b) => a.nome.localeCompare(b.nome));
-        
-        // Salvar no localStorage para cache
-        localStorage.setItem('vinko_states', JSON.stringify(sortedStates));
-        
-        setOptions(prev => ({ ...prev, states: sortedStates }));
-        setStatesLoaded(true);
-      } catch (error) {
-        console.error('Erro ao carregar estados:', error);
-      }
-    };
-
-    if (!statesLoaded) {
-      loadStates();
-    }
-  }, [statesLoaded]);
-
-  // Carregar cidades quando um estado for selecionado
+  // Carregar cidades quando um UF for selecionado
   useEffect(() => {
     const loadCities = async () => {
-      if (filters.states.length > 0) {
+      if (filters.ufs.length > 0) {
         try {
-          const stateIds = filters.states.map(stateName => {
-            const state = options.states.find(s => s.nome === stateName);
-            return state?.id;
-          }).filter(Boolean);
-
-          if (stateIds.length > 0) {
-            const citiesToLoad: number[] = [];
-            const citiesFromCache: City[] = [];
-
-            // Verificar quais estados precisam carregar cidades
-            stateIds.forEach(stateId => {
-              if (citiesCache[stateId]) {
-                citiesFromCache.push(...citiesCache[stateId]);
-              } else {
-                citiesToLoad.push(stateId);
-              }
-            });
-
-            // Carregar cidades que não estão em cache
-            if (citiesToLoad.length > 0) {
-              const citiesPromises = citiesToLoad.map(async (stateId) => {
-                const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${stateId}/municipios`);
-                const cities = await response.json();
-                
-                // Salvar no cache
-                setCitiesCache(prev => ({
-                  ...prev,
-                  [stateId]: cities
-                }));
-                
-                return cities;
-              });
-
-              const newCitiesArrays = await Promise.all(citiesPromises);
-              const allNewCities = citiesFromCache.concat(newCitiesArrays.flat());
-              const sortedCities = allNewCities.sort((a: City, b: City) => a.nome.localeCompare(b.nome));
-              
-              setOptions(prev => ({
-                ...prev,
-                cities: sortedCities
-              }));
-            } else {
-              // Todas as cidades já estão em cache
-              const sortedCities = citiesFromCache.sort((a: City, b: City) => a.nome.localeCompare(b.nome));
-              setOptions(prev => ({
-                ...prev,
-                cities: sortedCities
-              }));
-            }
+          const allCities: { id: number; nome: string }[] = [];
+          
+          // Carregar cidades para cada UF selecionado
+          for (const uf of filters.ufs) {
+            const cities = await LocationService.getCitiesByState(uf);
+            allCities.push(...cities);
           }
+          
+          // Remover duplicatas e ordenar
+          const uniqueCities = allCities.filter((city, index, self) => 
+            index === self.findIndex(c => c.nome === city.nome)
+          ).sort((a, b) => a.nome.localeCompare(b.nome));
+          
+          setOptions(prev => ({
+            ...prev,
+            cities: uniqueCities
+          }));
         } catch (error) {
           console.error('Erro ao carregar cidades:', error);
+          setOptions(prev => ({ ...prev, cities: [] }));
         }
       } else {
         setOptions(prev => ({ ...prev, cities: [] }));
@@ -285,7 +212,7 @@ export function SearchProfessionalsPage() {
     if (statesLoaded) {
       loadCities();
     }
-  }, [filters.states, options.states, citiesCache, statesLoaded]);
+  }, [filters.ufs, statesLoaded]);
 
   // Fechar dropdowns quando clicar fora
   useEffect(() => {
@@ -313,8 +240,8 @@ export function SearchProfessionalsPage() {
         newValues = [...currentValues, value];
       }
 
-      // Se for estado, não limpar cidades selecionadas (serão filtradas automaticamente)
-      if (filterType === 'states') {
+      // Se for UF, não limpar cidades selecionadas (serão filtradas automaticamente)
+      if (filterType === 'ufs') {
         return {
           ...prev,
           [filterType]: newValues
@@ -332,23 +259,14 @@ export function SearchProfessionalsPage() {
     setFilters(prev => {
       const newValues = (prev[filterType] as (string | number)[]).filter(v => v !== value);
       
-      // Se for estado, remover apenas as cidades daquele estado
-      if (filterType === 'states') {
-        const removedState = options.states.find(s => s.nome === value);
-        if (removedState) {
-          const citiesToRemove = citiesCache[removedState.id] || [];
-          const citiesToRemoveNames = citiesToRemove.map(city => city.nome);
-          
-          const remainingCities = (prev.cities as string[]).filter(cityName => 
-            !citiesToRemoveNames.includes(cityName)
-          );
-          
-          return {
-            ...prev,
-            [filterType]: newValues,
-            cities: remainingCities
-          };
-        }
+      // Se for UF, remover apenas as cidades daquele estado
+      if (filterType === 'ufs') {
+        // Quando um UF é removido, as cidades serão automaticamente recarregadas
+        // pelo useEffect que monitora filters.ufs
+        return {
+          ...prev,
+          [filterType]: newValues
+        };
       }
 
       return {
@@ -366,7 +284,7 @@ export function SearchProfessionalsPage() {
       fabricTypes: '',
       availabilities: [],
       cities: [],
-      states: []
+      ufs: []
     });
   };
 
@@ -397,12 +315,19 @@ export function SearchProfessionalsPage() {
   ) => {
     const currentValues = filters[filterType] as (string | number)[];
     const isOpen = openDropdowns[filterType] || false;
-    const displayName = (item: any) => item.nome || item.name;
+    const displayName = (item: any) => {
+      if (filterType === 'ufs') {
+        return item.code;
+      }
+      return item.nome || item.name;
+    };
     const searchTerm = searchTerms[filterType] || '';
 
     // Filtrar opções que não estão selecionadas
     const availableOptions = options.filter(option => {
-      if (filterType === 'states' || filterType === 'cities') {
+      if (filterType === 'ufs') {
+        return !currentValues.includes(option.code);
+      } else if (filterType === 'cities') {
         return !currentValues.includes(displayName(option));
       } else {
         return !currentValues.includes(option.id);
@@ -469,7 +394,9 @@ export function SearchProfessionalsPage() {
                   key={option.id}
                   className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors text-gray-700"
                   onClick={() => {
-                    if (filterType === 'states' || filterType === 'cities') {
+                    if (filterType === 'ufs') {
+                      handleFilterChange(filterType, option.code);
+                    } else if (filterType === 'cities') {
                       handleFilterChange(filterType, optionName);
                     } else {
                       handleFilterChange(filterType, option.id);
@@ -498,9 +425,9 @@ export function SearchProfessionalsPage() {
     if (values.length === 0) return null;
 
     const getDisplayValue = (value: string | number) => {
-      if (filterType === 'states') {
-        const state = options.states.find(s => s.nome === value);
-        return state ? state.nome : value;
+      if (filterType === 'ufs') {
+        const uf = options.ufs.find(u => u.code === value);
+        return uf ? uf.code : value;
       } else if (filterType === 'cities') {
         return value;
       } else {
@@ -668,8 +595,8 @@ export function SearchProfessionalsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Estado
             </label>
-            {renderMultiSelect('states', 'Selecione...', options.states, false)}
-            {renderSelectedTags('states')}
+            {renderMultiSelect('ufs', 'Selecione...', options.ufs, false)}
+            {renderSelectedTags('ufs')}
           </div>
 
           {/* Cidade */}
@@ -677,7 +604,7 @@ export function SearchProfessionalsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cidade
             </label>
-            {filters.states.length === 0 ? (
+            {filters.ufs.length === 0 ? (
               <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed">
                 Selecione um estado primeiro
               </div>
@@ -755,8 +682,8 @@ export function SearchProfessionalsPage() {
                 <div className="space-y-3 flex-grow">
                   <div className="flex items-center text-sm text-gray-700">
                     <MapPin className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap overflow-hidden text-ellipsis" title={professional.city && professional.state ? `${professional.city} - ${professional.state}` : '-'}>
-                      {professional.city && professional.state ? `${professional.city} - ${professional.state}` : '-'}
+                    <span className="whitespace-nowrap overflow-hidden text-ellipsis" title={professional.city && professional.uf ? `${professional.city} - ${professional.uf}` : '-'}>
+                      {professional.city && professional.uf ? `${professional.city} - ${professional.uf}` : '-'}
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-700">

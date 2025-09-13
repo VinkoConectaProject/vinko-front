@@ -180,7 +180,7 @@ export function AdminDashboard() {
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{professional.name}</p>
-                            <p className="text-sm text-gray-500">{professional.city}, {professional.state}</p>
+                            <p className="text-sm text-gray-500">{professional.city}, {professional.uf}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -211,7 +211,7 @@ export function AdminDashboard() {
                             <p className="font-medium text-gray-900">{client.name}</p>
                             <p className="text-sm text-gray-500">
                               {client.company && `${client.company} - `}
-                              {client.city}, {client.state}
+                              {client.city}, {client.uf}
                             </p>
                           </div>
                         </div>
@@ -308,7 +308,7 @@ export function AdminDashboard() {
                               </div>
                               <div>
                                 <p className="font-medium text-gray-900">{professional.name}</p>
-                                <p className="text-sm text-gray-500">{professional.city}, {professional.state}</p>
+                                <p className="text-sm text-gray-500">{professional.city}, {professional.uf}</p>
                                 <p className="text-sm text-gray-600 mt-1">{professional.description}</p>
                                 <div className="flex items-center space-x-2 mt-2">
                                   {professional.services.slice(0, 3).map((service, index) => (

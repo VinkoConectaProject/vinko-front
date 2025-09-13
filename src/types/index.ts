@@ -47,7 +47,6 @@ export interface DjangoUser {
   cep: string | null;
   city: string | null;
   uf: string | null;
-  state: string | null;
   neighborhood: string | null;
   street: string | null;
   number: string | null;
@@ -64,12 +63,12 @@ export interface DjangoUser {
   corporate_complement: string | null;
   company_neighborhood: string | null;
   company_city: string | null;
-  company_state: string | null;
+  company_uf: string | null;
   company_street: string | null;
   company_number: string | null;
   company_complement: string | null;
   corporate_city: string | null;
-  corporate_state: string | null;
+  corporate_uf: string | null;
   company_email: string | null;
   professional_description: string | null;
   user_type: string; // Agora é uma string: 'CLIENTE' ou 'PROFISSIONAL'
@@ -180,7 +179,7 @@ export interface ProfessionalProfile {
   services: string[];
   specialty: string;
   city: string;
-  state: string;
+  uf: string;
   portfolio: string[];
   availability: 'available' | 'busy' | 'unavailable';
   contact: {
@@ -202,7 +201,7 @@ export interface ClientProfile {
   name: string;
   company?: string;
   city: string;
-  state: string;
+  uf: string;
   contact: {
     phone: string;
     email: string;

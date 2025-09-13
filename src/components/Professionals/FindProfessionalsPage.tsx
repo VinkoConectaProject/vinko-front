@@ -251,7 +251,7 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
                 <div className="mb-3">
                   <div className="flex items-center text-sm text-gray-600">
                     <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                    <span className="truncate">{professional.city}, {professional.state}</span>
+                    <span className="truncate">{professional.city}, {professional.uf}</span>
                   </div>
                 </div>
 
@@ -358,7 +358,7 @@ function ProfessionalProfileModal({ professional, onClose, onContact, onStartCon
                 <h2 className="text-2xl font-semibold text-gray-900">{professional.name}</h2>
                 <div className="flex items-center space-x-2 text-gray-500">
                   <MapPin className="h-4 w-4" />
-                  <span>{professional.city}, {professional.state}</span>
+                  <span>{professional.city}, {professional.uf}</span>
                 </div>
                 <div className="flex items-center space-x-2 mt-1">
                   <Star className="h-4 w-4 text-yellow-500 fill-current" />

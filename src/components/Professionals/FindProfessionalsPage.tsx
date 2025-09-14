@@ -8,9 +8,16 @@ interface FindProfessionalsPageProps {
 
 export function FindProfessionalsPage({ onStartConversation }: FindProfessionalsPageProps) {
   const { state } = useApp();
+  
+  // Obter perfil do cliente atual
+  const currentClientProfile = state.clientProfiles.find(
+    profile => profile.userId === state.currentUser?.id
+  );
+  
+  // Definir filtros padrão baseados no perfil do cliente
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedService, setSelectedService] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState(currentClientProfile?.city || '');
   const [selectedAvailability, setSelectedAvailability] = useState('');
   const [selectedProfessional, setSelectedProfessional] = useState<any>(null);
 
@@ -50,8 +57,10 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
         return false;
       }
       
-      // Filter by location
-      if (selectedLocation && professional.city !== selectedLocation) {
+      // Filter by location (cidade ou estado)
+      if (selectedLocation && 
+          professional.city !== selectedLocation && 
+          professional.uf !== selectedLocation) {
         return false;
       }
       
@@ -64,7 +73,10 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
     });
   }, [state.professionalProfiles, searchTerm, selectedService, selectedLocation, selectedAvailability]);
 
-  const uniqueLocations = [...new Set(state.professionalProfiles.map(p => p.city))];
+  // Combinar cidades e estados únicos para o filtro de localização
+  const uniqueCities = [...new Set(state.professionalProfiles.map(p => p.city))];
+  const uniqueStates = [...new Set(state.professionalProfiles.map(p => p.uf))];
+  const uniqueLocations = [...uniqueCities, ...uniqueStates].filter(Boolean).sort();
 
   const handleContact = (professional: any) => {
     if (professional.contact.whatsapp) {
@@ -109,6 +121,13 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
         <p className="text-gray-600">
           Encontre profissionais qualificados para seus projetos
         </p>
+        {currentClientProfile?.city && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <span className="font-medium">Filtro automático aplicado:</span> Mostrando profissionais da sua região ({currentClientProfile.city}, {currentClientProfile.uf})
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -162,13 +181,13 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
             onClick={() => {
               setSearchTerm('');
               setSelectedService('');
-              setSelectedLocation('');
+              setSelectedLocation(currentClientProfile?.city || '');
               setSelectedAvailability('');
             }}
             className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
           >
             <Filter className="h-4 w-4 mr-2" />
-            Limpar
+            Redefinir Filtros
           </button>
         </div>
       </div>

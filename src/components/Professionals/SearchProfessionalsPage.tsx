@@ -3,6 +3,8 @@ import { Search, ChevronDown, X, Scissors, Shirt, Calendar, MapPin, Phone, Mail,
 import { userService } from '../../services/userService';
 import { BRAZILIAN_STATES } from '../../data/locations';
 import { LocationService } from '../../services/locationService';
+import { useApp } from '../../contexts/AppContext';
+import { useUserRefresh } from '../../hooks/useUserRefresh';
 
 interface ServiceOption {
   id: number;
@@ -45,15 +47,27 @@ interface SearchResponse {
 }
 
 export function SearchProfessionalsPage() {
+  const { state } = useApp();
+  const { refreshUserData } = useUserRefresh();
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [lastSearchTerm, setLastSearchTerm] = useState(''); // Para controlar quando fazer busca
+  const [isResettingFilters, setIsResettingFilters] = useState(false);
+  
+  // Obter dados do usuário atual
+  const currentUser = state.djangoUser;
+  
+  // DEBUG: Remover logs em produção
+  // console.log('👤 Dados do usuário atual:', currentUser);
+  
   const [filters, setFilters] = useState<SearchFilters>({
     serviceTypes: [],
     operationAreas: [],
-    specialties: [],
+    specialties: [], // Será preenchido pelo useEffect quando as especialidades forem carregadas
     fabricTypes: '',
     availabilities: [],
-    cities: [],
-    ufs: []
+    cities: currentUser?.city ? [currentUser.city] : [],
+    ufs: currentUser?.uf ? [currentUser.uf] : []
   });
 
   const [options, setOptions] = useState<{
@@ -84,10 +98,13 @@ export function SearchProfessionalsPage() {
   const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
 
   // Função para buscar profissionais
-  const searchProfessionals = async () => {
+  const searchProfessionals = async (customSearchTerm?: string) => {
     try {
       setSearchLoading(true);
       setSearchMessage('');
+
+      // Usar o termo customizado se fornecido, senão usar o estado atual
+      const currentSearchTerm = customSearchTerm !== undefined ? customSearchTerm : searchTerm;
 
       // Construir parâmetros da URL
       const params = new URLSearchParams();
@@ -100,7 +117,15 @@ export function SearchProfessionalsPage() {
         params.append('areas', filters.operationAreas.join(','));
       }
       if (filters.specialties.length > 0) {
-        params.append('specialties', filters.specialties.join(','));
+        // Se as especialidades são nomes, converter para IDs se necessário
+        const specialtyIds = filters.specialties.map(specialtyName => {
+          const specialty = options.specialties.find(s => s.name === specialtyName);
+          return specialty ? specialty.id : specialtyName;
+        }).filter(Boolean);
+        
+        if (specialtyIds.length > 0) {
+          params.append('specialties', specialtyIds.join(','));
+        }
       }
       if (filters.fabricTypes) {
         params.append('tecid_type', filters.fabricTypes);
@@ -114,8 +139,8 @@ export function SearchProfessionalsPage() {
       if (filters.cities.length > 0) {
         params.append('cities', filters.cities.join(','));
       }
-      if (searchTerm.trim()) {
-        params.append('search', searchTerm.trim());
+      if (currentSearchTerm && currentSearchTerm.trim().length >= 3) {
+        params.append('search', currentSearchTerm.trim());
       }
 
       const response = await fetch(`http://localhost:8000/api/v1/user/professionals/search/?${params.toString()}`, {
@@ -140,6 +165,38 @@ export function SearchProfessionalsPage() {
       setSearchMessage('Erro ao conectar com o servidor');
     } finally {
       setSearchLoading(false);
+    }
+  };
+
+  // Função para busca dinâmica com debounce
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    
+    // Limpar timer anterior
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+    
+    const currentLength = value.trim().length;
+    const lastLength = lastSearchTerm.trim().length;
+    
+    // Só fazer busca em duas situações:
+    // 1. Chegou aos 3 caracteres (primeira vez)
+    // 2. Tinha 3+ caracteres e agora tem menos de 3 (voltou)
+    const shouldSearch = 
+      (currentLength >= 3) || // Chegou aos 3 caracteres
+      (lastLength >= 3 && currentLength < 3); // Tinha 3+ e agora tem menos
+    
+    if (shouldSearch) {
+      const timer = setTimeout(() => {
+        if (currentLength >= 3) {
+          searchProfessionals(value); // Buscar com termo
+        } else {
+          searchProfessionals(''); // Buscar sem termo, só filtros
+        }
+        setLastSearchTerm(value); // Atualizar último termo buscado
+      }, 500);
+      setSearchDebounceTimer(timer);
     }
   };
 
@@ -178,7 +235,82 @@ export function SearchProfessionalsPage() {
     setStatesLoaded(true);
   }, []);
 
-  // Carregar cidades quando um UF for selecionado
+  // Atualizar dados do usuário automaticamente quando a página carrega
+  useEffect(() => {
+    const updateUserData = async () => {
+      try {
+        await refreshUserData();
+      } catch (error) {
+        console.error('Erro ao atualizar dados do usuário:', error);
+      }
+    };
+
+    updateUserData();
+  }, []); // Executa apenas uma vez quando o componente monta
+
+  // Aplicar filtro de especialidade quando as especialidades forem carregadas
+  useEffect(() => {
+    // console.log('🔄 useEffect especialidade executado');
+    
+    // Tentar usar specialties, services_areas ou specialty
+    const userSpecialtyIds = currentUser?.specialties || currentUser?.services_areas || [];
+    const hasSpecialty = currentUser?.specialty || userSpecialtyIds.length > 0;
+    
+    if (hasSpecialty && options.specialties.length > 0) {
+      let userSpecialties: any[] = [];
+      
+      // Se tem specialty como string, tentar encontrar por nome
+      if (currentUser?.specialty) {
+        let userSpecialty = options.specialties.find(
+          specialty => specialty.name === currentUser.specialty
+        );
+        
+        if (!userSpecialty) {
+          userSpecialty = options.specialties.find(
+            specialty => specialty.name.toLowerCase() === currentUser.specialty?.toLowerCase()
+          );
+        }
+        
+        if (userSpecialty) {
+          userSpecialties.push(userSpecialty);
+        }
+      }
+      
+      // Se tem services_areas (IDs), buscar por ID
+      if (userSpecialtyIds.length > 0) {
+        const specialtiesById = userSpecialtyIds.map((id: number) => {
+          return options.specialties.find(specialty => specialty.id === id);
+        }).filter(Boolean);
+        userSpecialties.push(...specialtiesById);
+      }
+      
+      // Remover duplicatas
+      userSpecialties = userSpecialties.filter((specialty, index, self) => 
+        index === self.findIndex(s => s.id === specialty.id)
+      );
+      
+      if (userSpecialties.length > 0) {
+        const specialtyNames = userSpecialties.map(s => s.name);
+        setFilters(prev => ({
+          ...prev,
+          specialties: specialtyNames
+        }));
+      }
+    }
+  }, [currentUser?.specialty, currentUser?.services_areas, currentUser?.specialties, options.specialties]);
+
+  // Busca automática APENAS na primeira vez que a página carregar (se houver dados completos do usuário)
+  useEffect(() => {
+    if (currentUser?.city && currentUser?.uf && statesLoaded && !loading && options.specialties.length > 0) {
+      // Aguardar um pouco para garantir que os filtros foram aplicados
+      const timer = setTimeout(() => {
+        searchProfessionals();
+      }, 1500); // Tempo para garantir que especialidades sejam aplicadas
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser?.city, currentUser?.uf, statesLoaded, loading, options.specialties.length]); // Removido filters.specialties para evitar busca automática em mudanças de filtro
+
+  // Carregar cidades quando UFs forem selecionados
   useEffect(() => {
     const loadCities = async () => {
       if (filters.ufs.length > 0) {
@@ -227,6 +359,15 @@ export function SearchProfessionalsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Limpar timer de busca quando componente for desmontado
+  useEffect(() => {
+    return () => {
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+      }
+    };
+  }, [searchDebounceTimer]);
+
   const handleFilterChange = (filterType: keyof SearchFilters, value: string | number) => {
     setFilters(prev => {
       const currentValues = prev[filterType] as (string | number)[];
@@ -259,13 +400,22 @@ export function SearchProfessionalsPage() {
     setFilters(prev => {
       const newValues = (prev[filterType] as (string | number)[]).filter(v => v !== value);
       
-      // Se for UF, remover apenas as cidades daquele estado
+      // Se for UF, remover também as cidades daquele estado que foi removido
       if (filterType === 'ufs') {
-        // Quando um UF é removido, as cidades serão automaticamente recarregadas
-        // pelo useEffect que monitora filters.ufs
+        // Se não há mais UFs selecionados, limpar todas as cidades
+        if (newValues.length === 0) {
+          return {
+            ...prev,
+            [filterType]: newValues,
+            cities: []
+          };
+        }
+        
+        // Se ainda há UFs, limpar cidades para forçar nova seleção baseada nos UFs restantes
         return {
           ...prev,
-          [filterType]: newValues
+          [filterType]: newValues,
+          cities: [] // Simplificado: limpar todas as cidades quando qualquer UF for removido
         };
       }
 
@@ -277,16 +427,53 @@ export function SearchProfessionalsPage() {
   };
 
   const resetFilters = () => {
+    // Encontrar as especialidades do usuário
+    let userSpecialtyNames: string[] = [];
+    
+    // Tentar usar specialties, services_areas se specialty não estiver disponível
+    const userSpecialtyIds = currentUser?.specialties || currentUser?.services_areas || [];
+    const hasSpecialty = currentUser?.specialty || userSpecialtyIds.length > 0;
+    
+    if (hasSpecialty && options.specialties.length > 0) {
+      let userSpecialties: any[] = [];
+      
+      // Se tem specialty como string
+      if (currentUser?.specialty) {
+        let userSpecialty = options.specialties.find(
+          specialty => specialty.name === currentUser.specialty || 
+                      specialty.name.toLowerCase() === currentUser.specialty?.toLowerCase()
+        );
+        if (userSpecialty) {
+          userSpecialties.push(userSpecialty);
+        }
+      }
+      
+      // Se tem services_areas (IDs)
+      if (userSpecialtyIds.length > 0) {
+        const specialtiesById = userSpecialtyIds.map((id: number) => {
+          return options.specialties.find(specialty => specialty.id === id);
+        }).filter(Boolean);
+        userSpecialties.push(...specialtiesById);
+      }
+      
+      // Remover duplicatas e extrair nomes
+      userSpecialties = userSpecialties.filter((specialty, index, self) => 
+        index === self.findIndex(s => s.id === specialty.id)
+      );
+      userSpecialtyNames = userSpecialties.map(s => s.name);
+    }
+
     setFilters({
       serviceTypes: [],
       operationAreas: [],
-      specialties: [],
+      specialties: userSpecialtyNames,
       fabricTypes: '',
       availabilities: [],
-      cities: [],
-      ufs: []
+      cities: currentUser?.city ? [currentUser.city] : [],
+      ufs: currentUser?.uf ? [currentUser.uf] : []
     });
   };
+
 
   const toggleDropdown = (filterType: string) => {
     setOpenDropdowns(prev => {
@@ -495,19 +682,19 @@ export function SearchProfessionalsPage() {
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Procurar"
+            placeholder="Procurar (mínimo 3 caracteres)..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                searchProfessionals();
+              if (e.key === 'Enter' && searchTerm.trim().length >= 3) {
+                searchProfessionals(searchTerm);
               }
             }}
             className="w-full pl-12 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-base"
           />
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm('')}
+              onClick={() => handleSearchChange('')}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <X className="h-5 w-5" />
@@ -595,7 +782,26 @@ export function SearchProfessionalsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Estado
             </label>
-            {renderMultiSelect('ufs', 'Selecione...', options.ufs, false)}
+            <select
+              value=""
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value && !filters.ufs.includes(value)) {
+                  setFilters(prev => ({
+                    ...prev,
+                    ufs: [...prev.ufs, value]
+                  }));
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            >
+              <option value="">Adicionar estado...</option>
+              {BRAZILIAN_STATES.filter(state => !filters.ufs.includes(state.code)).map(state => (
+                <option key={state.code} value={state.code}>
+                  {state.code}
+                </option>
+              ))}
+            </select>
             {renderSelectedTags('ufs')}
           </div>
 
@@ -604,13 +810,29 @@ export function SearchProfessionalsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cidade
             </label>
-            {filters.ufs.length === 0 ? (
-              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed">
-                Selecione um estado primeiro
-              </div>
-            ) : (
-              renderMultiSelect('cities', 'Selecione...', options.cities, false)
-            )}
+            <select
+              value=""
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value && !filters.cities.includes(value)) {
+                  setFilters(prev => ({
+                    ...prev,
+                    cities: [...prev.cities, value]
+                  }));
+                }
+              }}
+              disabled={filters.ufs.length === 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {filters.ufs.length === 0 ? 'Primeiro selecione um estado' : 'Adicionar cidade...'}
+              </option>
+              {options.cities.filter(city => !filters.cities.includes(city.nome)).map(city => (
+                <option key={city.id} value={city.nome}>
+                  {city.nome}
+                </option>
+              ))}
+            </select>
             {renderSelectedTags('cities')}
           </div>
         </div>
@@ -619,13 +841,29 @@ export function SearchProfessionalsPage() {
       {/* Action Buttons */}
       <div className="flex justify-end space-x-4 mt-6 pt-4 border-t border-gray-200">
         <button
-          onClick={resetFilters}
-          className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+          onClick={async () => {
+            setIsResettingFilters(true);
+            resetFilters();
+            // Executar busca após redefinir filtros
+            setTimeout(async () => {
+              await searchProfessionals();
+              setIsResettingFilters(false);
+            }, 100); // Pequeno delay para garantir que os filtros foram aplicados
+          }}
+          disabled={isResettingFilters || searchLoading}
+          className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
         >
-          Redefinir Filtros
+          {isResettingFilters ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700 mr-2"></div>
+              Redefinindo...
+            </>
+          ) : (
+            'Redefinir Filtros'
+          )}
         </button>
         <button
-          onClick={searchProfessionals}
+          onClick={() => searchProfessionals()}
           disabled={searchLoading}
           className="px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
         >

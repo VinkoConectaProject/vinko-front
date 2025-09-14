@@ -4,6 +4,7 @@ import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppStat
 type AppAction = 
   | { type: 'SET_USER'; payload: User | null }
   | { type: 'SET_DJANGO_USER'; payload: DjangoUser | null }
+  | { type: 'UPDATE_DJANGO_USER'; payload: DjangoUser }
   | { type: 'ADD_USER'; payload: User }
   | { type: 'SET_USERS'; payload: User[] }
   | { type: 'SET_LOADING'; payload: boolean }
@@ -55,6 +56,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_USER':
       return { ...state, currentUser: action.payload };
+    case 'SET_DJANGO_USER':
+      return { ...state, djangoUser: action.payload };
+    case 'UPDATE_DJANGO_USER':
+      return { ...state, djangoUser: action.payload };
     case 'ADD_USER':
       return { 
         ...state, 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, X, Scissors, Shirt, Calendar, MapPin, Phone, Mail, Target, Star, Layers } from 'lucide-react';
+import { Search, ChevronDown, X, Scissors, Shirt, Calendar, MapPin, Phone, Mail, Target, Star, Layers, MessageSquare, Eye } from 'lucide-react';
 import { userService } from '../../services/userService';
 import { BRAZILIAN_STATES } from '../../data/locations';
 import { LocationService } from '../../services/locationService';
@@ -53,6 +53,8 @@ export function SearchProfessionalsPage() {
   const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [lastSearchTerm, setLastSearchTerm] = useState(''); // Para controlar quando fazer busca
   const [isResettingFilters, setIsResettingFilters] = useState(false);
+  const [showNoPhoneModal, setShowNoPhoneModal] = useState(false);
+  const [selectedProfessionalName, setSelectedProfessionalName] = useState('');
   
   // Obter dados do usuário atual
   const currentUser = state.djangoUser;
@@ -98,27 +100,30 @@ export function SearchProfessionalsPage() {
   const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
 
   // Função para buscar profissionais
-  const searchProfessionals = async (customSearchTerm?: string) => {
+  const searchProfessionals = async (customSearchTerm?: string, customFilters?: SearchFilters) => {
     try {
       setSearchLoading(true);
       setSearchMessage('');
 
       // Usar o termo customizado se fornecido, senão usar o estado atual
       const currentSearchTerm = customSearchTerm !== undefined ? customSearchTerm : searchTerm;
+      
+      // Usar filtros customizados se fornecidos, senão usar o estado atual
+      const currentFilters = customFilters || filters;
 
       // Construir parâmetros da URL
       const params = new URLSearchParams();
 
       // Adicionar filtros apenas se tiverem valores
-      if (filters.serviceTypes.length > 0) {
-        params.append('services', filters.serviceTypes.join(','));
+      if (currentFilters.serviceTypes.length > 0) {
+        params.append('services', currentFilters.serviceTypes.join(','));
       }
-      if (filters.operationAreas.length > 0) {
-        params.append('areas', filters.operationAreas.join(','));
+      if (currentFilters.operationAreas.length > 0) {
+        params.append('areas', currentFilters.operationAreas.join(','));
       }
-      if (filters.specialties.length > 0) {
+      if (currentFilters.specialties.length > 0) {
         // Se as especialidades são nomes, converter para IDs se necessário
-        const specialtyIds = filters.specialties.map(specialtyName => {
+        const specialtyIds = currentFilters.specialties.map(specialtyName => {
           const specialty = options.specialties.find(s => s.name === specialtyName);
           return specialty ? specialty.id : specialtyName;
         }).filter(Boolean);
@@ -127,17 +132,17 @@ export function SearchProfessionalsPage() {
           params.append('specialties', specialtyIds.join(','));
         }
       }
-      if (filters.fabricTypes) {
-        params.append('tecid_type', filters.fabricTypes);
+      if (currentFilters.fabricTypes) {
+        params.append('tecid_type', currentFilters.fabricTypes);
       }
-      if (filters.availabilities.length > 0) {
-        params.append('availabilities', filters.availabilities.join(','));
+      if (currentFilters.availabilities.length > 0) {
+        params.append('availabilities', currentFilters.availabilities.join(','));
       }
-      if (filters.ufs.length > 0) {
-        params.append('ufs', filters.ufs.join(','));
+      if (currentFilters.ufs.length > 0) {
+        params.append('ufs', currentFilters.ufs.join(','));
       }
-      if (filters.cities.length > 0) {
-        params.append('cities', filters.cities.join(','));
+      if (currentFilters.cities.length > 0) {
+        params.append('cities', currentFilters.cities.join(','));
       }
       if (currentSearchTerm && currentSearchTerm.trim().length >= 3) {
         params.append('search', currentSearchTerm.trim());
@@ -427,51 +432,19 @@ export function SearchProfessionalsPage() {
   };
 
   const resetFilters = () => {
-    // Encontrar as especialidades do usuário
-    let userSpecialtyNames: string[] = [];
-    
-    // Tentar usar specialties, services_areas se specialty não estiver disponível
-    const userSpecialtyIds = currentUser?.specialties || currentUser?.services_areas || [];
-    const hasSpecialty = currentUser?.specialty || userSpecialtyIds.length > 0;
-    
-    if (hasSpecialty && options.specialties.length > 0) {
-      let userSpecialties: any[] = [];
-      
-      // Se tem specialty como string
-      if (currentUser?.specialty) {
-        let userSpecialty = options.specialties.find(
-          specialty => specialty.name === currentUser.specialty || 
-                      specialty.name.toLowerCase() === currentUser.specialty?.toLowerCase()
-        );
-        if (userSpecialty) {
-          userSpecialties.push(userSpecialty);
-        }
-      }
-      
-      // Se tem services_areas (IDs)
-      if (userSpecialtyIds.length > 0) {
-        const specialtiesById = userSpecialtyIds.map((id: number) => {
-          return options.specialties.find(specialty => specialty.id === id);
-        }).filter(Boolean);
-        userSpecialties.push(...specialtiesById);
-      }
-      
-      // Remover duplicatas e extrair nomes
-      userSpecialties = userSpecialties.filter((specialty, index, self) => 
-        index === self.findIndex(s => s.id === specialty.id)
-      );
-      userSpecialtyNames = userSpecialties.map(s => s.name);
-    }
-
-    setFilters({
+    // Limpar todos os filtros completamente
+    const newFilters = {
       serviceTypes: [],
       operationAreas: [],
-      specialties: userSpecialtyNames,
+      specialties: [],
       fabricTypes: '',
       availabilities: [],
-      cities: currentUser?.city ? [currentUser.city] : [],
-      ufs: currentUser?.uf ? [currentUser.uf] : []
-    });
+      cities: [],
+      ufs: []
+    };
+
+    setFilters(newFilters);
+    return newFilters; // Retornar os novos filtros para uso imediato
   };
 
 
@@ -843,12 +816,20 @@ export function SearchProfessionalsPage() {
         <button
           onClick={async () => {
             setIsResettingFilters(true);
-            resetFilters();
-            // Executar busca após redefinir filtros
-            setTimeout(async () => {
-              await searchProfessionals();
+            
+            try {
+              // Resetar filtros e obter os novos filtros
+              const newFilters = resetFilters();
+              
+              // Limpar o campo de pesquisa também
+              setSearchTerm('');
+              setLastSearchTerm('');
+              
+              // Executar busca imediatamente com os novos filtros (sem aguardar estado)
+              await searchProfessionals('', newFilters);
+            } finally {
               setIsResettingFilters(false);
-            }, 100); // Pequeno delay para garantir que os filtros foram aplicados
+            }
           }}
           disabled={isResettingFilters || searchLoading}
           className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
@@ -898,19 +879,22 @@ export function SearchProfessionalsPage() {
                 <div className="mb-4 pb-4 border-b border-gray-200 space-y-3">
                   <div className="flex items-center text-sm text-gray-700">
                     <Target className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap overflow-hidden text-ellipsis" title={professional.areas.length > 0 ? professional.areas.join(', ') : '-'}>
+                    <span className="font-medium text-gray-600 mr-1">Área:</span>
+                    <span className="text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex-1" title={professional.areas.length > 0 ? professional.areas.join(', ') : '-'}>
                       {professional.areas.length > 0 ? professional.areas.join(', ') : '-'}
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-700">
                     <Star className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap overflow-hidden text-ellipsis" title={professional.specialties.length > 0 ? professional.specialties.join(', ') : '-'}>
+                    <span className="font-medium text-gray-600 mr-1">Especialidades:</span>
+                    <span className="text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex-1" title={professional.specialties.length > 0 ? professional.specialties.join(', ') : '-'}>
                       {professional.specialties.length > 0 ? professional.specialties.join(', ') : '-'}
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-700">
                     <Layers className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap overflow-hidden text-ellipsis" title={professional.tecid_type || '-'}>
+                    <span className="font-medium text-gray-600 mr-1">Tecido:</span>
+                    <span className="text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis flex-1" title={professional.tecid_type || '-'}>
                       {professional.tecid_type || '-'}
                     </span>
                   </div>
@@ -938,14 +922,53 @@ export function SearchProfessionalsPage() {
                   </div>
                 </div>
 
-                {/* Botão de Contato */}
-                <div className="pt-6 mt-auto">
-                  <a 
-                    href={`mailto:${professional.email}`}
-                    className="w-full bg-pink-500 text-white text-center py-3 px-4 rounded-lg hover:bg-pink-600 transition-colors text-sm font-medium block"
+                {/* Botões de Ação */}
+                <div className="pt-6 mt-auto space-y-3">
+                  {/* Botão Conversar - Primário */}
+                  <button
+                    onClick={() => {
+                      // Função será implementada depois
+                      console.log('Conversar com:', professional.full_name);
+                    }}
+                    className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center justify-center"
                   >
-                    Entrar em contato
-                  </a>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Conversar
+                  </button>
+
+                  {/* Botões Secundários */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        // Verificar se tem WhatsApp/telefone
+                        const phone = professional.cellphone || professional.telephone;
+                        if (phone) {
+                          const cleanPhone = phone.replace(/\D/g, '');
+                          const message = `Olá ${professional.full_name}! Vi seu perfil na VINKO e gostaria de conversar sobre um projeto.`;
+                          const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+                          window.open(whatsappUrl, '_blank');
+                        } else {
+                          setSelectedProfessionalName(professional.full_name);
+                          setShowNoPhoneModal(true);
+                        }
+                      }}
+                      className="bg-green-600 text-white py-2 px-3 rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center justify-center"
+                    >
+                      <Phone className="h-4 w-4 mr-1" />
+                      WhatsApp
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        // Função será implementada depois
+                        console.log('Ver perfil de:', professional.full_name);
+                      }}
+                      className="bg-gray-100 text-gray-700 py-2 px-3 rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center justify-center"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ver perfil
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -956,6 +979,34 @@ export function SearchProfessionalsPage() {
       {professionals.length === 0 && searchMessage && !searchLoading && (
         <div className="mt-6 text-center text-gray-500">
           <p>Nenhum profissional encontrado com os filtros aplicados.</p>
+        </div>
+      )}
+
+      {/* Modal de Telefone Não Cadastrado */}
+      {showNoPhoneModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Phone className="h-8 w-8 text-yellow-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Telefone não cadastrado
+              </h3>
+              <p className="text-gray-600 mb-6">
+                O profissional <span className="font-medium">{selectedProfessionalName}</span> não possui telefone cadastrado para WhatsApp.
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Você pode tentar entrar em contato através do botão "Conversar" ou aguardar até que o profissional atualize suas informações de contato.
+              </p>
+              <button
+                onClick={() => setShowNoPhoneModal(false)}
+                className="w-full bg-pink-500 text-white py-3 px-4 rounded-lg hover:bg-pink-600 transition-colors font-medium"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

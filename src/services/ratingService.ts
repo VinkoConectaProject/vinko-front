@@ -43,6 +43,13 @@ export class RatingService extends BaseApiService {
   }
 
   /**
+   * Lista avaliações por profissional
+   */
+  async getRatingsByProfessional(professionalId: number): Promise<ApiResponse<Rating[]>> {
+    return this.makeRequest<Rating[]>(`${this.baseUrl}/?professional=${professionalId}`);
+  }
+
+  /**
    * Obtém uma avaliação específica por ID
    */
   async getRatingById(ratingId: number): Promise<ApiResponse<Rating>> {

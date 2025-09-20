@@ -7,6 +7,7 @@ import { useApp } from '../../contexts/AppContext';
 import { useUserRefresh } from '../../hooks/useUserRefresh';
 import { StarRating } from '../UI/StarRating';
 import { RatingModal } from '../UI/RatingModal';
+import { ProfessionalProfileModal } from '../UI/ProfessionalProfileModal';
 import { ratingService } from '../../services/ratingService';
 import { ProfessionalSearchResult } from '../../types';
 
@@ -93,6 +94,59 @@ export function SearchProfessionalsPage() {
     setSelectedProfessional(null);
     setExistingRating(null);
   };
+
+  // Função para abrir modal de perfil
+  const handleOpenProfileModal = (professional: ProfessionalSearchResult) => {
+    setSelectedProfileProfessional(professional);
+    setShowProfileModal(true);
+  };
+
+  // Função para fechar modal de perfil
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false);
+    setSelectedProfileProfessional(null);
+  };
+
+  // Função para avaliar profissional a partir do modal de perfil
+  const handleRateFromProfile = (professional: ProfessionalSearchResult) => {
+    setSelectedProfessional(professional);
+    setShowRatingFromProfile(true);
+    
+    // Verificar se já existe avaliação para este profissional
+    if (currentUser?.id) {
+      ratingService.getRatingByClientProfessional(currentUser.id, professional.id)
+        .then(response => {
+          if (response.status === 'success' && response.data && Object.keys(response.data).length > 0 && response.data.id) {
+            setExistingRating({
+              id: response.data.id,
+              score: response.data.score || 0,
+              comment: response.data.comment || ''
+            });
+          } else {
+            setExistingRating(null);
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao verificar avaliação existente:', error);
+          setExistingRating(null);
+        });
+    }
+  };
+
+  // Função para fechar modal de avaliação do perfil e recarregar dados
+  const handleCloseRatingFromProfile = async () => {
+    setShowRatingFromProfile(false);
+    // Recarregar a lista de profissionais para atualizar os ratings nos cards
+    const updatedProfessionals = await searchProfessionals();
+    
+    // Se o modal de perfil estiver aberto, atualizar o profissional selecionado
+    if (showProfileModal && selectedProfileProfessional && updatedProfessionals) {
+      const updatedProfessional = updatedProfessionals.find(p => p.id === selectedProfileProfessional.id);
+      if (updatedProfessional) {
+        setSelectedProfileProfessional(updatedProfessional);
+      }
+    }
+  };
   
   // Função para submeter avaliação
   const handleRatingSubmit = async (rating: number, comment: string) => {
@@ -112,7 +166,16 @@ export function SearchProfessionalsPage() {
       }
       
       // Recarregar a lista de profissionais para atualizar os ratings
-      await searchProfessionals();
+      const updatedProfessionals = await searchProfessionals();
+      
+      // Se o modal de perfil estiver aberto, atualizar o profissional selecionado e trigger refresh das avaliações
+      if (showProfileModal && selectedProfileProfessional && updatedProfessionals) {
+        const updatedProfessional = updatedProfessionals.find(p => p.id === selectedProfileProfessional.id);
+        if (updatedProfessional) {
+          setSelectedProfileProfessional(updatedProfessional);
+        }
+        setProfileRefreshTrigger(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Erro ao salvar avaliação:', error);
       throw error;
@@ -127,7 +190,16 @@ export function SearchProfessionalsPage() {
       await ratingService.deleteRating(existingRating.id);
       
       // Recarregar a lista de profissionais para atualizar os ratings
-      await searchProfessionals();
+      const updatedProfessionals = await searchProfessionals();
+      
+      // Se o modal de perfil estiver aberto, atualizar o profissional selecionado e trigger refresh das avaliações
+      if (showProfileModal && selectedProfileProfessional && updatedProfessionals) {
+        const updatedProfessional = updatedProfessionals.find(p => p.id === selectedProfileProfessional.id);
+        if (updatedProfessional) {
+          setSelectedProfileProfessional(updatedProfessional);
+        }
+        setProfileRefreshTrigger(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Erro ao remover avaliação:', error);
       throw error;
@@ -181,9 +253,15 @@ export function SearchProfessionalsPage() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState<ProfessionalSearchResult | null>(null);
   const [existingRating, setExistingRating] = useState<{id: number; score: number; comment?: string} | null>(null);
+  
+  // Estados para modal de perfil
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedProfileProfessional, setSelectedProfileProfessional] = useState<ProfessionalSearchResult | null>(null);
+  const [showRatingFromProfile, setShowRatingFromProfile] = useState(false);
+  const [profileRefreshTrigger, setProfileRefreshTrigger] = useState(0);
 
   // Função para buscar profissionais
-  const searchProfessionals = async (customSearchTerm?: string, customFilters?: SearchFilters) => {
+  const searchProfessionals = async (customSearchTerm?: string, customFilters?: SearchFilters): Promise<ProfessionalSearchResult[]> => {
     try {
       setSearchLoading(true);
       setSearchMessage('');
@@ -244,14 +322,17 @@ export function SearchProfessionalsPage() {
       if (data.status === 'success') {
         setProfessionals(data.data);
         setSearchMessage(data.message);
+        return data.data;
       } else {
         setProfessionals([]);
         setSearchMessage(data.error || 'Erro ao buscar profissionais');
+        return [];
       }
     } catch (error) {
       console.error('Erro ao buscar profissionais:', error);
       setProfessionals([]);
       setSearchMessage('Erro ao conectar com o servidor');
+      return [];
     } finally {
       setSearchLoading(false);
     }
@@ -1077,10 +1158,7 @@ export function SearchProfessionalsPage() {
                     </button>
                     
                     <button
-                      onClick={() => {
-                        // Função será implementada depois
-                        console.log('Ver perfil de:', professional.full_name);
-                      }}
+                      onClick={() => handleOpenProfileModal(professional)}
                       className="bg-gray-100 text-gray-700 py-2 px-3 rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center justify-center"
                     >
                       <Eye className="h-4 w-4 mr-1" />
@@ -1110,6 +1188,38 @@ export function SearchProfessionalsPage() {
           existingRating={existingRating}
           onRatingSubmit={handleRatingSubmit}
           onRatingDelete={handleRatingDelete}
+        />
+      )}
+
+      {/* Modal de Avaliação a partir do perfil */}
+      {showRatingFromProfile && selectedProfessional && (
+        <RatingModal
+          isOpen={showRatingFromProfile}
+          onClose={handleCloseRatingFromProfile}
+          professionalId={selectedProfessional.id}
+          professionalName={selectedProfessional.full_name}
+          existingRating={existingRating}
+          onRatingSubmit={handleRatingSubmit}
+          onRatingDelete={handleRatingDelete}
+        />
+      )}
+
+      {/* Modal de Perfil do Profissional */}
+      {showProfileModal && selectedProfileProfessional && (
+        <ProfessionalProfileModal
+          isOpen={showProfileModal}
+          onClose={handleCloseProfileModal}
+          professional={selectedProfileProfessional}
+          onStartConversation={(professionalId) => {
+            console.log('Iniciar conversa com profissional:', professionalId);
+          }}
+          onRateProfessional={handleRateFromProfile}
+          showRatingModal={showRatingFromProfile}
+          onCloseRatingModal={() => setShowRatingFromProfile(false)}
+          onRatingSubmit={handleRatingSubmit}
+          onRatingDelete={handleRatingDelete}
+          refreshTrigger={profileRefreshTrigger}
+          currentUserId={currentUser?.id}
         />
       )}
 

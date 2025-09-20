@@ -304,6 +304,9 @@ export interface ProfessionalSearchResult {
   email: string;
   cellphone?: string;
   telephone?: string;
+  company_cellphone?: string;
+  about_me?: string;
+  year_experience?: string;
   rating_avg: number;
   rating_count: number;
 }

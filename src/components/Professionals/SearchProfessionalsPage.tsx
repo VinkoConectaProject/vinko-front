@@ -1031,7 +1031,11 @@ export function SearchProfessionalsPage() {
           <h3 className="text-lg font-normal text-gray-500 mb-4">Resultados encontrados</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {professionals.map((professional, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+              <div 
+                key={index} 
+                className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col cursor-pointer"
+                onClick={() => handleOpenProfileModal(professional)}
+              >
                 {/* Nome do Prestador */}
                 <h4 className="text-lg font-semibold text-gray-900 mb-2">{professional.full_name}</h4>
                 
@@ -1044,7 +1048,10 @@ export function SearchProfessionalsPage() {
                     />
                   </div>
                   <button
-                    onClick={() => handleOpenRatingModal(professional)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenRatingModal(professional);
+                    }}
                     className="text-pink-600 hover:text-pink-700 text-sm font-medium transition-colors"
                   >
                     Avaliar
@@ -1125,7 +1132,8 @@ export function SearchProfessionalsPage() {
                 <div className="pt-6 mt-auto space-y-3">
                   {/* Botão Conversar - Primário */}
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       // Função será implementada depois
                       console.log('Conversar com:', professional.full_name);
                     }}
@@ -1138,7 +1146,8 @@ export function SearchProfessionalsPage() {
                   {/* Botões Secundários */}
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         // Verificar se tem WhatsApp/telefone
                         const phone = professional.cellphone || professional.telephone;
                         if (phone) {
@@ -1158,7 +1167,10 @@ export function SearchProfessionalsPage() {
                     </button>
                     
                     <button
-                      onClick={() => handleOpenProfileModal(professional)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenProfileModal(professional);
+                      }}
                       className="bg-gray-100 text-gray-700 py-2 px-3 rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center justify-center"
                     >
                       <Eye className="h-4 w-4 mr-1" />

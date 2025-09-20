@@ -294,9 +294,13 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
 
                 {/* Status de disponibilidade */}
                 <div className="mb-4 flex-shrink-0">
-                  <span className={`inline-block px-4 py-2 text-sm font-medium rounded-full ${getAvailabilityColor(professional.availability)}`}>
-                    {getAvailabilityLabel(professional.availability)}
-                  </span>
+                  {professional.availability && professional.availability !== '' ? (
+                    <span className={`inline-block px-4 py-2 text-sm font-medium rounded-full ${getAvailabilityColor(professional.availability)}`}>
+                      {getAvailabilityLabel(professional.availability)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-500">-</span>
+                  )}
                 </div>
 
                 {/* Botões de ação */}

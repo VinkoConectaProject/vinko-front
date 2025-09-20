@@ -868,12 +868,25 @@ export function SearchProfessionalsPage() {
             {professionals.map((professional, index) => (
               <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
                 {/* Nome do Prestador */}
-                <h4 className="text-lg font-semibold text-gray-900 mb-1">{professional.full_name}</h4>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">{professional.full_name}</h4>
                 
                 {/* Serviços */}
-                <p className="text-sm text-gray-700 mb-6 whitespace-nowrap overflow-hidden text-ellipsis" title={professional.services.length > 0 ? professional.services.join(', ') : '-'}>
-                  {professional.services.length > 0 ? professional.services.join(', ') : '-'}
-                </p>
+                <div className="mb-6 h-8 flex items-center">
+                  {professional.services.length > 0 ? (
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide w-full">
+                      {professional.services.map((service, index) => (
+                        <span
+                          key={index}
+                          className="inline-block px-3 py-1 text-xs rounded-full bg-purple-200 text-purple-800 whitespace-nowrap flex-shrink-0"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-500">-</span>
+                  )}
+                </div>
 
                 {/* Primeira Seção: Áreas, Especialidades, Tipo de Tecido */}
                 <div className="mb-4 pb-4 border-b border-gray-200 space-y-3">
@@ -916,9 +929,13 @@ export function SearchProfessionalsPage() {
                   </div>
                   <div className="flex items-center text-sm text-gray-700">
                     <Calendar className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-                    <span className="inline-block px-3 py-1 text-xs rounded-full bg-green-200 text-green-800 whitespace-nowrap">
-                      {professional.availability || '-'}
-                    </span>
+                    {professional.availability ? (
+                      <span className="inline-block px-3 py-1 text-xs rounded-full bg-green-200 text-green-800 whitespace-nowrap">
+                        {professional.availability}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-500">-</span>
+                    )}
                   </div>
                 </div>
 

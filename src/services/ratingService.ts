@@ -6,6 +6,7 @@ export interface Rating {
   created_at: string;
   updated_at: string;
   score: number;
+  comment?: string;
   professional: number;
   client: number;
 }
@@ -13,10 +14,12 @@ export interface Rating {
 export interface CreateRatingRequest {
   professional: number;
   score: number;
+  comment?: string;
 }
 
 export interface UpdateRatingRequest {
   score: number;
+  comment?: string;
 }
 
 export interface GetRatingByClientProfessionalResponse {
@@ -24,6 +27,7 @@ export interface GetRatingByClientProfessionalResponse {
   created_at?: string;
   updated_at?: string;
   score?: number;
+  comment?: string;
   professional?: number;
   client?: number;
 }
@@ -92,12 +96,13 @@ export class RatingService extends BaseApiService {
   async createOrUpdateRating(
     professionalId: number,
     score: number,
+    comment?: string,
     existingRatingId?: number
   ): Promise<ApiResponse<Rating>> {
     if (existingRatingId) {
-      return this.updateRating(existingRatingId, { score });
+      return this.updateRating(existingRatingId, { score, comment });
     } else {
-      return this.createRating({ professional: professionalId, score });
+      return this.createRating({ professional: professionalId, score, comment });
     }
   }
 }

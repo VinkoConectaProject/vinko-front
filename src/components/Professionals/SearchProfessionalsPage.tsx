@@ -71,7 +71,8 @@ export function SearchProfessionalsPage() {
           console.log('✅ Encontrou avaliação existente:', response.data);
           setExistingRating({
             id: response.data.id,
-            score: response.data.score || 0
+            score: response.data.score || 0,
+            comment: response.data.comment || ''
           });
         } else {
           console.log('❌ Nenhuma avaliação encontrada');
@@ -94,18 +95,19 @@ export function SearchProfessionalsPage() {
   };
   
   // Função para submeter avaliação
-  const handleRatingSubmit = async (rating: number) => {
+  const handleRatingSubmit = async (rating: number, comment: string) => {
     if (!selectedProfessional || !currentUser?.id) return;
     
     try {
       if (existingRating) {
         // Atualizar avaliação existente
-        await ratingService.updateRating(existingRating.id, { score: rating });
+        await ratingService.updateRating(existingRating.id, { score: rating, comment });
       } else {
         // Criar nova avaliação
         await ratingService.createRating({
           professional: selectedProfessional.id,
-          score: rating
+          score: rating,
+          comment
         });
       }
       
@@ -178,7 +180,7 @@ export function SearchProfessionalsPage() {
   // Estados para modal de avaliação
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState<ProfessionalSearchResult | null>(null);
-  const [existingRating, setExistingRating] = useState<{id: number; score: number} | null>(null);
+  const [existingRating, setExistingRating] = useState<{id: number; score: number; comment?: string} | null>(null);
 
   // Função para buscar profissionais
   const searchProfessionals = async (customSearchTerm?: string, customFilters?: SearchFilters) => {
@@ -957,8 +959,6 @@ export function SearchProfessionalsPage() {
                   <div className="flex items-center space-x-2">
                     <StarRating 
                       rating={professional.rating_avg || 0} 
-                      showCount={true} 
-                      count={professional.rating_count || 0}
                       size="sm"
                     />
                   </div>

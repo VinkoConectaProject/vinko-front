@@ -10,8 +10,9 @@ interface RatingModalProps {
   existingRating?: {
     id: number;
     score: number;
+    comment?: string;
   } | null;
-  onRatingSubmit: (rating: number) => Promise<void>;
+  onRatingSubmit: (rating: number, comment: string) => Promise<void>;
   onRatingDelete: () => Promise<void>;
 }
 
@@ -25,6 +26,7 @@ export function RatingModal({
   onRatingDelete
 }: RatingModalProps) {
   const [rating, setRating] = useState(existingRating?.score || 0);
+  const [comment, setComment] = useState(existingRating?.comment || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -34,10 +36,13 @@ export function RatingModal({
     
     if (existingRating) {
       console.log('✅ Modal - Definindo rating para:', existingRating.score);
+      console.log('✅ Modal - Definindo comentário para:', existingRating.comment);
       setRating(existingRating.score);
+      setComment(existingRating.comment || '');
     } else {
       console.log('❌ Modal - Nenhuma avaliação existente, definindo rating para 0');
       setRating(0);
+      setComment('');
     }
   }, [existingRating, isOpen]);
 
@@ -49,7 +54,7 @@ export function RatingModal({
 
     setIsSubmitting(true);
     try {
-      await onRatingSubmit(rating);
+      await onRatingSubmit(rating, comment);
       onClose();
     } catch (error) {
       console.error('Erro ao enviar avaliação:', error);
@@ -92,7 +97,7 @@ export function RatingModal({
         </div>
 
         {/* Estrelas Centralizadas */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
             <StarRating
               rating={rating}
@@ -101,6 +106,24 @@ export function RatingModal({
               onRatingChange={setRating}
             />
           </div>
+        </div>
+
+        {/* Campo de Comentário */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Comentário (opcional)
+          </label>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Deixe um comentário sobre o trabalho realizado..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+            rows={3}
+            maxLength={255}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {comment.length}/255 caracteres
+          </p>
         </div>
 
         {/* Botões Centralizados */}

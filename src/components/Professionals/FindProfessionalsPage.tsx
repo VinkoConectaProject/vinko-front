@@ -91,13 +91,13 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
   const getAvailabilityColor = (availability: string) => {
     switch (availability) {
       case 'available':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-200 text-green-800';
       case 'busy':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-200 text-yellow-800';
       case 'unavailable':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-200 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-200 text-gray-800';
     }
   };
 
@@ -294,7 +294,7 @@ export function FindProfessionalsPage({ onStartConversation }: FindProfessionals
 
                 {/* Status de disponibilidade */}
                 <div className="mb-4 flex-shrink-0">
-                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${getAvailabilityColor(professional.availability)}`}>
+                  <span className={`inline-block px-4 py-2 text-sm font-medium rounded-full ${getAvailabilityColor(professional.availability)}`}>
                     {getAvailabilityLabel(professional.availability)}
                   </span>
                 </div>

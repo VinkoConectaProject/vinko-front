@@ -916,7 +916,7 @@ export function SearchProfessionalsPage() {
                   </div>
                   <div className="flex items-center text-sm text-gray-700">
                     <Calendar className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap overflow-hidden text-ellipsis" title={professional.availability || '-'}>
+                    <span className="inline-block px-3 py-1 text-xs rounded-full bg-green-200 text-green-800 whitespace-nowrap">
                       {professional.availability || '-'}
                     </span>
                   </div>

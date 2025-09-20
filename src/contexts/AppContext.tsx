@@ -186,8 +186,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state, 
         ratings: [...state.ratings, action.payload] 
       };
-    case 'SET_DJANGO_USER':
-      return { ...state, djangoUser: action.payload };
     case 'SET_AUTH_LOADING':
       return { ...state, authLoading: action.payload };
     case 'SET_AUTH_ERROR':

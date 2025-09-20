@@ -89,25 +89,47 @@ export class BaseApiService {
 
   // Tratar resposta da API
   private handleApiResponse<T>(responseData: any): ApiResponse<T> {
-    // Verificar se a resposta tem a estrutura esperada da API
-    if (!responseData.hasOwnProperty('status') || !responseData.hasOwnProperty('message')) {
-      console.error('Resposta da API em formato inválido:', responseData);
-      throw new Error(ERROR_MESSAGES.API_INVALID_FORMAT);
-    }
+    // Verificar se a resposta tem a estrutura esperada da API (com status e message)
+    if (responseData.hasOwnProperty('status') && responseData.hasOwnProperty('message')) {
+      // Se a API retornou erro, lançar exceção com a mensagem
+      if (responseData.status === 'error') {
+        throw new Error(responseData.message || ERROR_MESSAGES.OPERATION_FAILED);
+      }
 
-    // Se a API retornou erro, lançar exceção com a mensagem
-    if (responseData.status === 'error') {
-      throw new Error(responseData.message || ERROR_MESSAGES.OPERATION_FAILED);
-    }
+      // Se a API retornou sucesso, retornar os dados
+      if (responseData.status === 'success') {
+        return responseData as ApiResponse<T>;
+      }
 
-    // Se a API retornou sucesso, retornar os dados
-    if (responseData.status === 'success') {
-      return responseData as ApiResponse<T>;
+      // Caso inesperado
+      console.error('Status de resposta inesperado da API:', responseData);
+      throw new Error(ERROR_MESSAGES.API_UNEXPECTED_STATUS);
     }
-
-    // Caso inesperado
-    console.error('Status de resposta inesperado da API:', responseData);
-    throw new Error(ERROR_MESSAGES.API_UNEXPECTED_STATUS);
+    
+    // Se não tem status/message, pode ser uma resposta direta (como no caso do rating)
+    // Verificar se é um objeto vazio (sem avaliação)
+    if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0) {
+      return {
+        status: 'success',
+        message: 'Nenhuma avaliação encontrada',
+        error: '',
+        data: null as T
+      };
+    }
+    
+    // Se tem dados, tratar como sucesso
+    if (responseData && typeof responseData === 'object' && Object.keys(responseData).length > 0) {
+      return {
+        status: 'success',
+        message: 'Dados obtidos com sucesso',
+        error: '',
+        data: responseData as T
+      };
+    }
+    
+    // Caso padrão - erro
+    console.error('Resposta da API em formato inválido:', responseData);
+    throw new Error(ERROR_MESSAGES.API_INVALID_FORMAT);
   }
 
   // Renovar token automaticamente

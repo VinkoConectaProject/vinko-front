@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ChevronDown, X, Scissors, Shirt, Calendar, MapPin, Phone, Mail, Target, Star, Layers, MessageSquare, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronDown, X, Calendar, MapPin, Phone, Mail, Target, Star, Layers, MessageSquare, Eye } from 'lucide-react';
 import { userService } from '../../services/userService';
 import { BRAZILIAN_STATES } from '../../data/locations';
 import { LocationService } from '../../services/locationService';
 import { useApp } from '../../contexts/AppContext';
 import { useUserRefresh } from '../../hooks/useUserRefresh';
+import { StarRating } from '../UI/StarRating';
+import { RatingModal } from '../UI/RatingModal';
+import { ratingService } from '../../services/ratingService';
+import { ProfessionalSearchResult } from '../../types';
 
 interface ServiceOption {
   id: number;
@@ -27,34 +31,106 @@ interface SearchFilters {
   ufs: string[];
 }
 
-interface Professional {
-  full_name: string;
-  services: string[];
-  areas: string[];
-  specialties: string[];
-  tecid_type: string;
-  availability: number;
-  uf: string;
-  city: string;
-  email: string;
-}
 
 interface SearchResponse {
   status: string;
   message: string;
   error: string;
-  data: Professional[];
+  data: ProfessionalSearchResult[];
 }
 
 export function SearchProfessionalsPage() {
   const { state } = useApp();
   const { refreshUserData } = useUserRefresh();
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState<number | null>(null);
   const [lastSearchTerm, setLastSearchTerm] = useState(''); // Para controlar quando fazer busca
   const [isResettingFilters, setIsResettingFilters] = useState(false);
   const [showNoPhoneModal, setShowNoPhoneModal] = useState(false);
   const [selectedProfessionalName, setSelectedProfessionalName] = useState('');
+  
+  // Função para abrir modal de avaliação
+  const handleOpenRatingModal = async (professional: ProfessionalSearchResult) => {
+    setSelectedProfessional(professional);
+    
+    // Verificar se já existe avaliação para este profissional
+        if (currentUser?.id) {
+      try {
+        const response = await ratingService.getRatingByClientProfessional(
+          currentUser.id, 
+          professional.id
+        );
+        
+        console.log('🔍 Resposta da API para rating:', response);
+        console.log('🔍 Status:', response.status);
+        console.log('🔍 Data:', response.data);
+        console.log('🔍 Data keys:', response.data ? Object.keys(response.data) : 'no data');
+        
+        // Verificar se há dados na resposta e se não é um objeto vazio
+        if (response.status === 'success' && response.data && Object.keys(response.data).length > 0 && response.data.id) {
+          console.log('✅ Encontrou avaliação existente:', response.data);
+          setExistingRating({
+            id: response.data.id,
+            score: response.data.score || 0
+          });
+        } else {
+          console.log('❌ Nenhuma avaliação encontrada');
+          setExistingRating(null);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar avaliação existente:', error);
+        setExistingRating(null);
+      }
+    }
+    
+    setShowRatingModal(true);
+  };
+  
+  // Função para fechar modal de avaliação
+  const handleCloseRatingModal = () => {
+    setShowRatingModal(false);
+    setSelectedProfessional(null);
+    setExistingRating(null);
+  };
+  
+  // Função para submeter avaliação
+  const handleRatingSubmit = async (rating: number) => {
+    if (!selectedProfessional || !currentUser?.id) return;
+    
+    try {
+      if (existingRating) {
+        // Atualizar avaliação existente
+        await ratingService.updateRating(existingRating.id, { score: rating });
+      } else {
+        // Criar nova avaliação
+        await ratingService.createRating({
+          professional: selectedProfessional.id,
+          score: rating
+        });
+      }
+      
+      // Recarregar a lista de profissionais para atualizar os ratings
+      await searchProfessionals();
+    } catch (error) {
+      console.error('Erro ao salvar avaliação:', error);
+      throw error;
+    }
+  };
+  
+  // Função para remover avaliação
+  const handleRatingDelete = async () => {
+    if (!existingRating) return;
+    
+    try {
+      await ratingService.deleteRating(existingRating.id);
+      
+      // Recarregar a lista de profissionais para atualizar os ratings
+      await searchProfessionals();
+    } catch (error) {
+      console.error('Erro ao remover avaliação:', error);
+      throw error;
+    }
+  };
   
   // Obter dados do usuário atual
   const currentUser = state.djangoUser;
@@ -78,7 +154,7 @@ export function SearchProfessionalsPage() {
     specialties: ServiceOption[];
     availabilities: ServiceOption[];
     ufs: { code: string; name: string }[];
-    cities: City[];
+    cities: {id: number; nome: string}[];
   }>({
     services: [],
     serviceAreas: [],
@@ -94,10 +170,15 @@ export function SearchProfessionalsPage() {
   const [statesLoaded, setStatesLoaded] = useState(false);
 
   // Estados para busca de profissionais
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [professionals, setProfessionals] = useState<ProfessionalSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchMessage, setSearchMessage] = useState('');
   const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
+  
+  // Estados para modal de avaliação
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedProfessional, setSelectedProfessional] = useState<ProfessionalSearchResult | null>(null);
+  const [existingRating, setExistingRating] = useState<{id: number; score: number} | null>(null);
 
   // Função para buscar profissionais
   const searchProfessionals = async (customSearchTerm?: string, customFilters?: SearchFilters) => {
@@ -152,6 +233,7 @@ export function SearchProfessionalsPage() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
 
@@ -387,12 +469,12 @@ export function SearchProfessionalsPage() {
       }
 
       // Se for UF, não limpar cidades selecionadas (serão filtradas automaticamente)
-      if (filterType === 'ufs') {
-        return {
-          ...prev,
-          [filterType]: newValues
-        };
-      }
+        if (filterType === 'ufs') {
+          return {
+            ...prev,
+            [filterType]: newValues as string[]
+          };
+        }
 
       return {
         ...prev,
@@ -411,7 +493,7 @@ export function SearchProfessionalsPage() {
         if (newValues.length === 0) {
           return {
             ...prev,
-            [filterType]: newValues,
+            [filterType]: newValues as string[],
             cities: []
           };
         }
@@ -419,7 +501,7 @@ export function SearchProfessionalsPage() {
         // Se ainda há UFs, limpar cidades para forçar nova seleção baseada nos UFs restantes
         return {
           ...prev,
-          [filterType]: newValues,
+          [filterType]: newValues as string[],
           cities: [] // Simplificado: limpar todas as cidades quando qualquer UF for removido
         };
       }
@@ -477,7 +559,7 @@ export function SearchProfessionalsPage() {
     const isOpen = openDropdowns[filterType] || false;
     const displayName = (item: any) => {
       if (filterType === 'ufs') {
-        return item.code;
+        return (item as any).code;
       }
       return item.nome || item.name;
     };
@@ -486,7 +568,7 @@ export function SearchProfessionalsPage() {
     // Filtrar opções que não estão selecionadas
     const availableOptions = options.filter(option => {
       if (filterType === 'ufs') {
-        return !currentValues.includes(option.code);
+        return !currentValues.includes((option as any).code);
       } else if (filterType === 'cities') {
         return !currentValues.includes(displayName(option));
       } else {
@@ -555,7 +637,7 @@ export function SearchProfessionalsPage() {
                   className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors text-gray-700"
                   onClick={() => {
                     if (filterType === 'ufs') {
-                      handleFilterChange(filterType, option.code);
+                      handleFilterChange(filterType, (option as any).code);
                     } else if (filterType === 'cities') {
                       handleFilterChange(filterType, optionName);
                     } else {
@@ -586,8 +668,8 @@ export function SearchProfessionalsPage() {
 
     const getDisplayValue = (value: string | number) => {
       if (filterType === 'ufs') {
-        const uf = options.ufs.find(u => u.code === value);
-        return uf ? uf.code : value;
+        const uf = options.ufs.find(u => (u as any).code === value);
+        return uf ? (uf as any).code : value;
       } else if (filterType === 'cities') {
         return value;
       } else {
@@ -868,7 +950,25 @@ export function SearchProfessionalsPage() {
             {professionals.map((professional, index) => (
               <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
                 {/* Nome do Prestador */}
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">{professional.full_name}</h4>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">{professional.full_name}</h4>
+                
+                {/* Avaliação */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <StarRating 
+                      rating={professional.rating_avg || 0} 
+                      showCount={true} 
+                      count={professional.rating_count || 0}
+                      size="sm"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleOpenRatingModal(professional)}
+                    className="text-pink-600 hover:text-pink-700 text-sm font-medium transition-colors"
+                  >
+                    Avaliar
+                  </button>
+                </div>
                 
                 {/* Serviços */}
                 <div className="mb-6 h-8 flex items-center">
@@ -939,6 +1039,7 @@ export function SearchProfessionalsPage() {
                   </div>
                 </div>
 
+
                 {/* Botões de Ação */}
                 <div className="pt-6 mt-auto space-y-3">
                   {/* Botão Conversar - Primário */}
@@ -997,6 +1098,19 @@ export function SearchProfessionalsPage() {
         <div className="mt-6 text-center text-gray-500">
           <p>Nenhum profissional encontrado com os filtros aplicados.</p>
         </div>
+      )}
+
+      {/* Modal de Avaliação */}
+      {showRatingModal && selectedProfessional && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={handleCloseRatingModal}
+          professionalId={selectedProfessional.id}
+          professionalName={selectedProfessional.full_name}
+          existingRating={existingRating}
+          onRatingSubmit={handleRatingSubmit}
+          onRatingDelete={handleRatingDelete}
+        />
       )}
 
       {/* Modal de Telefone Não Cadastrado */}

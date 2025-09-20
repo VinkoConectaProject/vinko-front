@@ -289,3 +289,21 @@ export interface Message {
   isRead: boolean;
   type: 'text' | 'image' | 'file';
 }
+
+// Tipos para a API de busca de profissionais
+export interface ProfessionalSearchResult {
+  id: number;
+  full_name: string;
+  services: string[];
+  areas: string[];
+  specialties: string[];
+  tecid_type: string;
+  availability: number;
+  uf: string;
+  city: string;
+  email: string;
+  cellphone?: string;
+  telephone?: string;
+  rating_avg: number;
+  rating_count: number;
+}

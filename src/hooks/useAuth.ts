@@ -28,7 +28,6 @@ export const useAuth = () => {
       
       return success;
     } catch (error) {
-      console.error('Erro ao renovar tokens:', error);
       logout();
       return false;
     }
@@ -53,7 +52,6 @@ export const useAuth = () => {
             const currentUser = await authService.getCurrentUser();
             dispatch({ type: 'SET_DJANGO_USER', payload: currentUser });
           } catch (error) {
-            console.error('Erro ao buscar dados atualizados do usuário:', error);
             // Se falhar ao buscar dados atualizados, manter os dados do localStorage
             // mas tentar renovar tokens se necessário
             const isAuthenticated = await checkAndRefreshTokens();
@@ -62,7 +60,6 @@ export const useAuth = () => {
             }
           }
         } catch (error) {
-          console.error('Erro ao inicializar autenticação:', error);
           logout();
         } finally {
           isInitializing.current = false;

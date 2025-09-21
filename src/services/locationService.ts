@@ -31,7 +31,6 @@ export class LocationService {
       this.statesCache = states.sort((a, b) => a.sigla.localeCompare(b.sigla));
       return this.statesCache;
     } catch (error) {
-      console.error('Erro ao buscar estados:', error);
       return [];
     }
   }
@@ -49,7 +48,6 @@ export class LocationService {
       const state = states.find(s => s.sigla === stateCode);
       
       if (!state) {
-        console.error(`Estado não encontrado: ${stateCode}`);
         return [];
       }
 
@@ -62,7 +60,6 @@ export class LocationService {
       
       return sortedCities;
     } catch (error) {
-      console.error(`Erro ao buscar cidades do estado ${stateCode}:`, error);
       return [];
     }
   }

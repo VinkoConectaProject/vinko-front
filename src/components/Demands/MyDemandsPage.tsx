@@ -1045,7 +1045,7 @@ function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingM
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
-      alert('Por favor, selecione uma avaliação');
+      // Por favor, selecione uma avaliação
       return;
     }
     onSubmit(rating, comment);

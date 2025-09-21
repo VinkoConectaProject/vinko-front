@@ -93,7 +93,6 @@ export class UserService extends BaseApiService {
       }
       return [];
     } catch (error) {
-      console.error('Erro ao buscar serviços:', error);
       return [];
     }
   }
@@ -116,7 +115,6 @@ export class UserService extends BaseApiService {
       }
       return [];
     } catch (error) {
-      console.error('Erro ao buscar áreas de atuação:', error);
       return [];
     }
   }
@@ -133,7 +131,6 @@ export class UserService extends BaseApiService {
       const response = await this.makeRequest<ServiceOptionsResponse>('/user/specialties/');
       return response.data;
     } catch (error) {
-      console.error('Erro ao buscar especialidades:', error);
       return [];
     }
   }
@@ -150,7 +147,6 @@ export class UserService extends BaseApiService {
       const response = await this.makeRequest<ServiceOptionsResponse>('/user/machines/');
       return response.data;
     } catch (error) {
-      console.error('Erro ao buscar maquinários:', error);
       return [];
     }
   }
@@ -167,7 +163,6 @@ export class UserService extends BaseApiService {
       const response = await this.makeRequest<ServiceOptionsResponse>('/user/availabilities/');
       return response.data;
     } catch (error) {
-      console.error('Erro ao buscar disponibilidades:', error);
       return [];
     }
   }

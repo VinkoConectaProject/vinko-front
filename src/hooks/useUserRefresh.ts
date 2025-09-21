@@ -7,13 +7,10 @@ export function useUserRefresh() {
 
   const refreshUserData = useCallback(async () => {
     try {
-      console.log('🔄 Atualizando dados do usuário...');
       const updatedUser = await userService.getUserById();
-      console.log('✅ Dados atualizados:', updatedUser);
       dispatch({ type: 'UPDATE_DJANGO_USER', payload: updatedUser });
       return updatedUser;
     } catch (error) {
-      console.error('❌ Erro ao atualizar dados do usuário:', error);
       throw error;
     }
   }, [dispatch]);

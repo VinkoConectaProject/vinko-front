@@ -70,7 +70,6 @@ export function RegisterForm({ onSwitchToLogin, onBackToLanding, onShowEmailVeri
       onShowEmailVerification(formData.email.toLowerCase());
 
     } catch (error: unknown) {
-      console.error('Erro no cadastro:', error);
       handleApiError(error);
     } finally {
       setIsLoading(false);

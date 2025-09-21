@@ -318,7 +318,6 @@ function DemandDetailsModal({
   const [selectedImage, setSelectedImage] = useState<{ src: string; index: number } | null>(null);
 
   const openImageModal = (src: string, index: number) => {
-    console.log('Abrindo imagem:', src, 'índice:', index);
     setSelectedImage({ src, index });
   };
 
@@ -424,7 +423,6 @@ function DemandDetailsModal({
                     <div 
                       className="relative cursor-pointer"
                       onClick={() => {
-                        console.log('Clicou na imagem:', image, 'índice:', index);
                         openImageModal(image, index);
                       }}
                     >
@@ -433,7 +431,6 @@ function DemandDetailsModal({
                         alt={`Imagem ${index + 1} do projeto`}
                         className="w-full h-32 object-cover rounded-lg border hover:opacity-75 transition-opacity"
                         onError={(e) => {
-                          console.log('Erro ao carregar imagem:', image);
                           e.currentTarget.style.display = 'none';
                         }}
                       />

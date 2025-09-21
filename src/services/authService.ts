@@ -179,7 +179,6 @@ class AuthService extends BaseApiService {
     try {
       return JSON.parse(userStr);
     } catch (error) {
-      console.error('Erro ao fazer parse do usuário:', error);
       return null;
     }
   }
@@ -270,13 +269,11 @@ class AuthService extends BaseApiService {
           return true;
         } else {
           // Outro tipo de erro, fazer logout
-          console.error('Erro ao verificar tokens:', error);
           this.logout();
           return false;
         }
       }
     } catch (error) {
-      console.error('Erro ao renovar tokens:', error);
       this.logout();
       return false;
     }

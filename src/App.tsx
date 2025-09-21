@@ -70,8 +70,6 @@ function AppContent() {
       setAppState('resetPassword');
     } catch (error: unknown) {
       // Código inválido, redirecionar para página de esqueci a senha
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      console.error('Código de redefinição inválido:', errorMessage);
       setAppState('auth');
       setAuthMode('forgot');
     }

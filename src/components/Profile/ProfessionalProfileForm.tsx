@@ -47,6 +47,10 @@ interface FormData {
   commercialCity: string;
   commercialUf: string;
   commercialEmail: string;
+  companyCellphone: string;
+  
+  // Sobre
+  aboutMe: string;
   
   // Interesses
   serviceTypes: string[];
@@ -157,6 +161,10 @@ export function ProfessionalProfileForm() {
     commercialCity: '',
     commercialUf: '',
     commercialEmail: '',
+    companyCellphone: '',
+    
+    // Sobre
+    aboutMe: '',
     
     // Interesses
     serviceTypes: [],
@@ -273,6 +281,10 @@ export function ProfessionalProfileForm() {
         commercialCity: userData.company_city || '',
         commercialUf: userData.company_uf || '',
         commercialEmail: userData.company_email || '',
+        companyCellphone: userData.company_cellphone || '',
+        
+        // Sobre
+        aboutMe: userData.about_me || '',
         
         // Interesses
         serviceTypes: [],
@@ -398,8 +410,6 @@ export function ProfessionalProfileForm() {
       });
 
     } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
-      
       let errorMessage = 'Erro ao carregar dados do usuário.';
       
       if (error instanceof Error) {
@@ -439,7 +449,6 @@ export function ProfessionalProfileForm() {
       const citiesData = await LocationService.getCitiesByState(stateCode);
       setCities(prev => ({ ...prev, [type]: citiesData }));
     } catch (error) {
-      console.error(`Erro ao carregar cidades do estado ${stateCode}:`, error);
       setCities(prev => ({ ...prev, [type]: [] }));
     } finally {
       setLoadingCities(prev => ({ ...prev, [type]: false }));
@@ -494,8 +503,8 @@ export function ProfessionalProfileForm() {
 
     if (!formData.phone.trim()) {
       errors.phone = 'Campo obrigatório';
-    } else if (formData.phone.replace(/\D/g, '').length < 10) {
-      errors.phone = 'Telefone deve ter pelo menos 10 dígitos';
+    } else if (formData.phone.replace(/\D/g, '').length !== 11) {
+      errors.phone = 'Telefone deve ter 11 dígitos (formato: (99) 99999-9999)';
     }
 
     if (!formData.experienceYears || String(formData.experienceYears).trim() === '') {
@@ -571,6 +580,11 @@ export function ProfessionalProfileForm() {
         errors.commercialEmail = 'Campo obrigatório';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.commercialEmail)) {
         errors.commercialEmail = 'Email comercial deve ser válido';
+      }
+
+      // Validar telefone da empresa se preenchido
+      if (formData.companyCellphone.trim() && formData.companyCellphone.replace(/\D/g, '').length !== 11) {
+        errors.companyCellphone = 'Telefone deve ter 11 dígitos (formato: (99) 99999-9999)';
       }
     }
 
@@ -834,8 +848,8 @@ export function ProfessionalProfileForm() {
         }
 
         // Depois atualizar os dados do formulário
-        setFormData(prev => ({
-          ...prev,
+    setFormData(prev => ({
+      ...prev,
           city: data.localidade || '',
           uf: data.uf || '',
           address: data.logradouro || '',
@@ -843,7 +857,7 @@ export function ProfessionalProfileForm() {
         }));
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
+      // Erro ao buscar CEP
     }
   };
 
@@ -872,7 +886,7 @@ export function ProfessionalProfileForm() {
         }));
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP comercial:', error);
+      // Erro ao buscar CEP comercial
     }
   };
 
@@ -904,7 +918,6 @@ export function ProfessionalProfileForm() {
       
       return date.toLocaleDateString('pt-BR', options);
     } catch (error) {
-      console.error('Erro ao formatar data:', error);
       return '';
     }
   };
@@ -994,7 +1007,7 @@ export function ProfessionalProfileForm() {
     
     // Validar formulário antes de enviar
     if (!validateForm()) {
-      // Apenas mostrar os erros visuais (sem alert)
+      showToast('Por favor, corrija os erros nos campos destacados antes de salvar.', 'error');
       return;
     }
     
@@ -1029,6 +1042,8 @@ export function ProfessionalProfileForm() {
         company_city: formData.commercialCity,
         company_uf: formData.commercialUf,
         company_email: formData.commercialEmail,
+        company_cellphone: formData.companyCellphone.replace(/\D/g, ''),
+        about_me: formData.aboutMe,
         tecid_type: mapTecidTypeToApi(formData.fabricTypes),
         year_experience: formData.experienceYears,
         daily_production_capacity: formData.dailyProductionCapacity,
@@ -1065,7 +1080,6 @@ export function ProfessionalProfileForm() {
       showToast('Perfil salvo com sucesso!', 'success');
       
     } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
       showToast('Erro ao salvar perfil. Tente novamente.', 'error');
     } finally {
       setSaving(false);
@@ -1409,14 +1423,14 @@ export function ProfessionalProfileForm() {
                     </option>
                   ))}
                 </select>
-              </div>
+            </div>
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
                 <select
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   disabled={!formData.uf || loadingCities.personal}
                 >
                   <option value="">
@@ -1430,7 +1444,7 @@ export function ProfessionalProfileForm() {
                     </option>
                   ))}
                 </select>
-            </div>
+              </div>
             </div>
           </div>
         )}
@@ -1656,7 +1670,7 @@ export function ProfessionalProfileForm() {
                 {validationErrors.commercialUf && (
                   <p className="text-red-500 text-sm mt-1">{validationErrors.commercialUf}</p>
                 )}
-              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1690,6 +1704,29 @@ export function ProfessionalProfileForm() {
                   <p className="text-red-500 text-sm mt-1">{validationErrors.commercialCity}</p>
                 )}
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Telefone
+                </label>
+                <input
+                  type="text"
+                value={formData.companyCellphone}
+                onChange={(e) => handleMaskedInputChange('companyCellphone', e.target.value, 'phone')}
+                  disabled={isCommercialFieldDisabled()}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                    isCommercialFieldDisabled()
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : validationErrors.companyCellphone 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-pink-500'
+                  }`}
+                placeholder="(11) 99999-9999"
+                />
+                {validationErrors.companyCellphone && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.companyCellphone}</p>
+                )}
+              </div>
               
               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1719,10 +1756,31 @@ export function ProfessionalProfileForm() {
         {/* Interesses Tab */}
         {activeTab === 'interests' && (
           <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Especialidades</h2>
-            <p className="text-gray-600 mb-6">Selecione uma opção ou mais!</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Sobre e Especialidades</h2>
+            <p className="text-gray-600 mb-6">Conte um pouco sobre você e suas especialidades!</p>
             
             <div className="space-y-6">
+              {/* Campo: Sobre */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sobre você
+                </label>
+                <textarea
+                  value={formData.aboutMe}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Permitir colar e cortar automaticamente no limite de 255 caracteres
+                    const truncatedValue = value.length > 255 ? value.substring(0, 255) : value;
+                    handleInputChange('aboutMe', truncatedValue);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                  rows={4}
+                  placeholder="Conte um pouco sobre você, sua experiência e o que você oferece..."
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  {formData.aboutMe.length}/255 caracteres
+                </p>
+              </div>
               {/* Primeira linha: Tipo de Serviço e Área de Atuação */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>

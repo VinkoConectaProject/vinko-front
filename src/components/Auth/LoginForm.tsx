@@ -54,7 +54,6 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
       onLogin(authData.user);
 
     } catch (error: unknown) {
-      console.error('Erro no login:', error);
       
       // Verificar se é o erro específico de email não verificado
       if (error instanceof Error && (error.message.includes('não verificado') || error.message.includes('verificado'))) {

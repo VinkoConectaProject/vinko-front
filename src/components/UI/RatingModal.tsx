@@ -31,16 +31,10 @@ export function RatingModal({
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    console.log('🔍 Modal - existingRating:', existingRating);
-    console.log('🔍 Modal - professionalName:', professionalName);
-    
     if (existingRating) {
-      console.log('✅ Modal - Definindo rating para:', existingRating.score);
-      console.log('✅ Modal - Definindo comentário para:', existingRating.comment);
       setRating(existingRating.score);
       setComment(existingRating.comment || '');
     } else {
-      console.log('❌ Modal - Nenhuma avaliação existente, definindo rating para 0');
       setRating(0);
       setComment('');
     }
@@ -48,7 +42,6 @@ export function RatingModal({
 
   const handleSubmit = async () => {
     if (rating === 0) {
-      alert('Por favor, selecione uma avaliação');
       return;
     }
 
@@ -57,7 +50,7 @@ export function RatingModal({
       await onRatingSubmit(rating, comment);
       onClose();
     } catch (error) {
-      console.error('Erro ao enviar avaliação:', error);
+      // Erro ao enviar avaliação
     } finally {
       setIsSubmitting(false);
     }
@@ -71,7 +64,7 @@ export function RatingModal({
       await onRatingDelete();
       onClose();
     } catch (error) {
-      console.error('Erro ao remover avaliação:', error);
+      // Erro ao remover avaliação
     } finally {
       setIsDeleting(false);
     }

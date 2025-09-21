@@ -68,7 +68,6 @@ export function ProfessionalProfileModal({
         setRatings(response.data || []);
       }
     } catch (error) {
-      console.error('Erro ao carregar avaliações:', error);
       setRatings([]);
     } finally {
       setLoadingRatings(false);
@@ -138,12 +137,14 @@ export function ProfessionalProfileModal({
 
           <div className="p-6 space-y-6">
             {/* Sobre */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Sobre</h3>
-              <p className="text-gray-600">
-                {professional.about_me || 'Nenhuma informação disponível.'}
-              </p>
-            </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Sobre</h3>
+                <div className="max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                  <p className="text-gray-600 break-words whitespace-pre-wrap">
+                    {professional.about_me || 'Nenhuma informação disponível.'}
+                  </p>
+                </div>
+              </div>
 
             {/* Serviços */}
             <div>

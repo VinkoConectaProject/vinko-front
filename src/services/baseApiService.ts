@@ -75,8 +75,6 @@ export class BaseApiService {
       return this.handleApiResponse<T>(responseData);
 
     } catch (error) {
-      console.error('Erro na requisição:', error);
-      
       // Se já é um Error com mensagem, apenas rethrow
       if (error instanceof Error) {
         throw error;
@@ -102,7 +100,6 @@ export class BaseApiService {
       }
 
       // Caso inesperado
-      console.error('Status de resposta inesperado da API:', responseData);
       throw new Error(ERROR_MESSAGES.API_UNEXPECTED_STATUS);
     }
     
@@ -128,7 +125,6 @@ export class BaseApiService {
     }
     
     // Caso padrão - erro
-    console.error('Resposta da API em formato inválido:', responseData);
     throw new Error(ERROR_MESSAGES.API_INVALID_FORMAT);
   }
 

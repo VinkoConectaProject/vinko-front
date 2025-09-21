@@ -243,7 +243,7 @@ try {
     parsedData = JSON.parse(savedData, dateReviver);
   }
 } catch (error) {
-  console.error('Erro ao fazer parse do vinko-data:', error);
+  // Erro ao fazer parse do vinko-data
 }
         
         // Combinar dados
@@ -257,7 +257,7 @@ try {
           dispatch({ type: 'LOAD_DATA', payload: finalData });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        // Erro ao carregar dados
       } finally {
         if (isMounted) {
           // Delay maior para evitar piscamento
@@ -297,7 +297,7 @@ try {
             localStorage.setItem('vinko-current-user', JSON.stringify(state.currentUser));
           }
         } catch (error) {
-          console.error('Erro ao salvar dados:', error);
+          // Erro ao salvar dados
         }
       }, 1000); // Debounce de 1 segundo
       

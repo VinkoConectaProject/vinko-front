@@ -47,6 +47,10 @@ interface FormData {
   commercialCity: string;
   commercialUf: string;
   commercialEmail: string;
+  companyCellphone: string;
+  
+  // Sobre
+  aboutMe: string;
   
   // Interesses
   specialties: string[];
@@ -135,6 +139,10 @@ export function ClientProfileForm() {
     commercialCity: '',
     commercialUf: '',
     commercialEmail: '',
+    companyCellphone: '',
+    
+    // Sobre
+    aboutMe: '',
     
     // Interesses
     specialties: [],
@@ -170,7 +178,6 @@ export function ClientProfileForm() {
       
       return date.toLocaleDateString('pt-BR', options);
     } catch (error) {
-      console.error('Erro ao formatar data:', error);
       return '';
     }
   };
@@ -198,8 +205,8 @@ export function ClientProfileForm() {
 
     if (!formData.phone.trim()) {
       errors.phone = 'Campo obrigatório';
-    } else if (formData.phone.replace(/\D/g, '').length < 10) {
-      errors.phone = 'Telefone deve ter pelo menos 10 dígitos';
+    } else if (formData.phone.replace(/\D/g, '').length !== 11) {
+      errors.phone = 'Telefone deve ter 11 dígitos (formato: (99) 99999-9999)';
     }
 
     // Validações condicionais para empresas (CNPJ, MEI, LTDA, ME)
@@ -246,6 +253,11 @@ export function ClientProfileForm() {
         errors.commercialEmail = 'Campo obrigatório';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.commercialEmail)) {
         errors.commercialEmail = 'Email comercial deve ser válido';
+      }
+
+      // Validar telefone da empresa se preenchido
+      if (formData.companyCellphone.trim() && formData.companyCellphone.replace(/\D/g, '').length !== 11) {
+        errors.companyCellphone = 'Telefone deve ter 11 dígitos (formato: (99) 99999-9999)';
       }
     }
 
@@ -382,6 +394,10 @@ export function ClientProfileForm() {
         commercialCity: userData.company_city || '',
         commercialUf: userData.company_uf || '',
         commercialEmail: userData.company_email || '',
+        companyCellphone: userData.company_cellphone || '',
+        
+        // Sobre
+        aboutMe: userData.about_me || '',
         
         // Interesses
         specialties: [],
@@ -420,8 +436,6 @@ export function ClientProfileForm() {
       });
 
     } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
-      
       let errorMessage = 'Erro ao carregar dados do usuário.';
       
       if (error instanceof Error) {
@@ -528,7 +542,7 @@ export function ClientProfileForm() {
         }));
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
+      // Erro ao buscar CEP
     }
   };
 
@@ -557,7 +571,7 @@ export function ClientProfileForm() {
         }));
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP comercial:', error);
+      // Erro ao buscar CEP comercial
     }
   };
 
@@ -574,7 +588,6 @@ export function ClientProfileForm() {
       const citiesData = await LocationService.getCitiesByState(stateCode);
       setCities(prev => ({ ...prev, [type]: citiesData }));
     } catch (error) {
-      console.error(`Erro ao carregar cidades do estado ${stateCode}:`, error);
       setCities(prev => ({ ...prev, [type]: [] }));
     } finally {
       setLoadingCities(prev => ({ ...prev, [type]: false }));
@@ -641,6 +654,7 @@ export function ClientProfileForm() {
     
     // Validar formulário antes de enviar
     if (!validateForm()) {
+      showToast('Por favor, corrija os erros nos campos destacados antes de salvar.', 'error');
       return;
     }
     
@@ -675,6 +689,8 @@ export function ClientProfileForm() {
         company_city: formData.commercialCity,
         company_uf: formData.commercialUf,
         company_email: formData.commercialEmail,
+        company_cellphone: formData.companyCellphone.replace(/\D/g, ''),
+        about_me: formData.aboutMe,
         specialties_ids: formData.specialties.map(name => 
           options.specialties.find(s => s.name === name)?.id
         ).filter(id => id !== undefined) as number[],
@@ -696,7 +712,6 @@ export function ClientProfileForm() {
       showToast('Perfil salvo com sucesso!', 'success');
       
     } catch (error) {
-      console.error('Erro ao salvar perfil:', error);
       showToast('Erro ao salvar perfil. Tente novamente.', 'error');
     } finally {
       setSaving(false);
@@ -1403,6 +1418,29 @@ export function ClientProfileForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Telefone
+              </label>
+              <input
+                type="text"
+                value={formData.companyCellphone}
+                onChange={(e) => handleMaskedInputChange('companyCellphone', e.target.value, 'phone')}
+                disabled={isCommercialFieldDisabled()}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                  isCommercialFieldDisabled()
+                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : validationErrors.companyCellphone 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:ring-pink-500'
+                }`}
+                placeholder="(11) 99999-9999"
+              />
+              {validationErrors.companyCellphone && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.companyCellphone}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 E-mail comercial {['CNPJ', 'MEI', 'LTDA', 'ME'].includes(formData.companySize) && <span className="text-red-500">*</span>}
               </label>
               <input
@@ -1429,11 +1467,33 @@ export function ClientProfileForm() {
         {/* Interesses Tab */}
         {activeTab === 'interests' && (
           <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Especialidades</h2>
-            <p className="text-gray-600 mb-6">Selecione uma opção ou mais!</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Sobre e Especialidades</h2>
+            <p className="text-gray-600 mb-6">Conte um pouco sobre você e suas especialidades!</p>
             
             <div className="space-y-6">
-              {/* Campo único: Especialidades */}
+              {/* Campo: Sobre */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sobre você
+                </label>
+                <textarea
+                  value={formData.aboutMe}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Permitir colar e cortar automaticamente no limite de 255 caracteres
+                    const truncatedValue = value.length > 255 ? value.substring(0, 255) : value;
+                    handleInputChange('aboutMe', truncatedValue);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                  rows={4}
+                  placeholder="Conte um pouco sobre você, sua experiência e o que você oferece..."
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  {formData.aboutMe.length}/255 caracteres
+                </p>
+              </div>
+
+              {/* Campo: Especialidades */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades</label>
                 {renderSelectField('specialties', 'Selecione as especialidades', options.specialties.map(s => s.name))}

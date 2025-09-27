@@ -36,12 +36,19 @@ export class BaseApiService {
     
     const defaultOptions: RequestInit = {
       headers: {
-        'Content-Type': 'application/json',
         ...authHeaders,
         ...options.headers,
       },
       ...options,
     };
+
+    // Só adicionar Content-Type se não for FormData
+    if (!(options.body instanceof FormData)) {
+      defaultOptions.headers = {
+        'Content-Type': 'application/json',
+        ...defaultOptions.headers,
+      };
+    }
 
     try {
       const response = await fetch(url, defaultOptions);

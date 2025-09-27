@@ -15,6 +15,10 @@ export const API_CONFIG = {
     USER: {
       USERS: '/user/users/',
       USER_BY_ID: '/user/users/me/', // Rota para obter usuário atual
+    },
+    DEMANDS: {
+      DEMANDS: '/demand/demands/',
+      DEMAND_FILES: '/demand/demand-files/',
     }
   }
 };

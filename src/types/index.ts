@@ -209,13 +209,94 @@ export interface ClientProfile {
   createdAt: Date;
 }
 
+// Tipos para demandas do backend
+export interface BackendDemand {
+  id: number;
+  user_cellphone?: string;
+  user_full_name?: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  title: string;
+  description: string;
+  amount: number;
+  tecid_type: "AMBOS" | "MALHA" | "PLANO";
+  deadline: string;
+  city: string;
+  uf: string;
+  min_budget: string;
+  max_budget: string;
+  remote_work_accepted: boolean;
+  status: "ABERTA" | "EM ANDAMENTO" | "CONCLUIDA";
+  user_created: number;
+  availability: number;
+  service: number;
+  area: number;
+  specialty: number;
+  chosen_professional: number | null;
+  interested_professionals: number[];
+}
+
+export interface DemandsApiResponse {
+  status: 'success' | 'error';
+  message: string;
+  error: string;
+  data: {
+    total: number;
+    abertas: number;
+    em_andamento: number;
+    concluidas: number;
+    results: BackendDemand[];
+  };
+}
+
+// Tipos para criação de demandas
+export interface CreateDemandRequest {
+  title: string;
+  description: string;
+  amount: number;
+  availability: number;
+  service: number;
+  area: number;
+  specialty: number;
+  tecid_type: "AMBOS" | "MALHA" | "PLANO";
+  deadline: string | null;
+  city: string;
+  uf: string;
+  min_budget: number;
+  max_budget: number;
+  remote_work_accepted: boolean;
+}
+
+export interface UpdateDemandRequest {
+  title?: string;
+  description?: string;
+  amount?: number;
+  availability?: number;
+  service?: number;
+  area?: number;
+  specialty?: number;
+  tecid_type?: "AMBOS" | "MALHA" | "PLANO";
+  deadline?: string | null;
+  city?: string;
+  uf?: string;
+  min_budget?: number;
+  max_budget?: number;
+  remote_work_accepted?: boolean;
+}
+
+export interface CreateDemandApiResponse extends ApiResponse<BackendDemand> {}
+export interface UpdateDemandApiResponse extends ApiResponse<BackendDemand> {}
+export interface DeleteDemandApiResponse extends ApiResponse<null> {}
+
+// Interface para compatibilidade com o frontend atual
 export interface Demand {
   id: string;
   clientId: string;
   title: string;
   description: string;
   serviceType: string;
-  deadline: Date;
+  deadline: Date | null;
   budget: {
     min: number;
     max: number;

@@ -259,14 +259,32 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
   };
 
-  const handleShowInterest = (demandId: string) => {
-    // Implementar interesse na demanda via API
-    showMessage('Funcionalidade de interesse será implementada em breve.', 'info');
+  const handleShowInterest = async (demandId: string) => {
+    try {
+      if (!currentUser?.id) {
+        showMessage('Usuário não encontrado. Faça login novamente.', 'error');
+        return;
+      }
+
+      // Chamar API para demonstrar interesse
+      await demandService.showInterest(parseInt(demandId), currentUser.id);
+      
+      // Atualizar a lista de oportunidades para refletir a mudança
+      await loadOpportunities();
+      
+      showMessage('Interesse demonstrado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao demonstrar interesse:', error);
+      showMessage('Erro ao demonstrar interesse. Tente novamente.', 'error');
+    }
   };
 
   const isInterestedInDemand = (demandId: string) => {
-    // Implementar verificação de interesse via API
-    return false;
+    if (!currentUser?.id) return false;
+    
+    // Verificar se o usuário atual está na lista de profissionais interessados
+    const demand = opportunities.find(d => d.id === demandId);
+    return demand?.interestedProfessionals?.includes(currentUser.id.toString()) || false;
   };
 
   const clearFilters = async () => {
@@ -552,13 +570,13 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
 
             {/* Tipo de Serviço */}
             <div className="flex-1 min-w-0">
-              {renderMultiSelect('services', 'Selecione...', services, false)}
+              {renderMultiSelect('services', 'Selecione o tipo de serviço', services, false)}
               {renderSelectedTags('services')}
             </div>
 
             {/* Área de Atuação */}
             <div className="flex-1 min-w-0">
-              {renderMultiSelect('areas', 'Selecione...', serviceAreas, false)}
+              {renderMultiSelect('areas', 'Selecione a área de atuação', serviceAreas, false)}
               {renderSelectedTags('areas')}
             </div>
           </div>
@@ -567,13 +585,13 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
           <div className="flex flex-col md:flex-row gap-4">
             {/* Estado */}
             <div className="flex-1 min-w-0">
-              {renderMultiSelect('states', 'Selecione...', states, false)}
+              {renderMultiSelect('states', 'Selecione o estado', states, false)}
               {renderSelectedTags('states')}
             </div>
 
             {/* Cidade */}
             <div className="flex-1 min-w-0">
-              {renderMultiSelect('cities', 'Selecione...', cities, filters.states.length === 0)}
+              {renderMultiSelect('cities', 'Selecione a cidade', cities, filters.states.length === 0)}
               {renderSelectedTags('cities')}
             </div>
 
@@ -593,7 +611,7 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
               </button>
               <button 
                 onClick={loadOpportunities}
-                className="flex items-center justify-center px-4 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm h-10 flex-1 md:flex-none"
+                className="flex items-center justify-center px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm h-10 flex-1 md:flex-none"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filtrar
@@ -683,46 +701,90 @@ function OpportunityCard({
             {demand.title}
           </h3>
           <div className="max-h-20 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 mb-4">
-            <p className="text-gray-600">{demand.description}</p>
+            <p 
+              className="text-gray-600"
+              title={demand.description}
+            >
+              {demand.description}
+            </p>
           </div>
           
           <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
             <div className="flex items-center">
-              <User className="h-4 w-4 mr-1" />
-              {demand.serviceType || '-'}
+              <User className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span 
+                className="truncate"
+                title={demand.serviceType || '-'}
+              >
+                {demand.serviceType || '-'}
+              </span>
             </div>
             <div className="flex items-center">
-              <MapPin className="h-4 w-4 mr-1" />
-              {demand.location.city && demand.location.state ? `${demand.location.city}, ${demand.location.state}` : '-'}
+              <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span 
+                className="truncate"
+                title={demand.location.city && demand.location.state ? `${demand.location.city}, ${demand.location.state}` : '-'}
+              >
+                {demand.location.city && demand.location.state ? `${demand.location.city}, ${demand.location.state}` : '-'}
+              </span>
             </div>
             <div className="flex items-center">
-              <DollarSign className="h-4 w-4 mr-1" />
-              {demand.budget.min > 0 || demand.budget.max > 0 
-                ? (() => {
-                    const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
-                    const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString()}` : '';
-                    if (min && max) {
-                      return `Mín: ${min} - Máx: ${max}`;
-                    } else if (min) {
-                      return `Mín: ${min}`;
-                    } else if (max) {
-                      return `Máx: ${max}`;
-                    }
-                    return '-';
-                  })()
-                : '-'
-              }
+              <DollarSign className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span 
+                className="truncate"
+                title={demand.budget.min > 0 || demand.budget.max > 0 
+                  ? (() => {
+                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
+                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString()}` : '';
+                      if (min && max) {
+                        return `Mín: ${min} - Máx: ${max}`;
+                      } else if (min) {
+                        return `Mín: ${min}`;
+                      } else if (max) {
+                        return `Máx: ${max}`;
+                      }
+                      return '-';
+                    })()
+                  : '-'
+                }
+              >
+                {demand.budget.min > 0 || demand.budget.max > 0 
+                  ? (() => {
+                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
+                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString()}` : '';
+                      if (min && max) {
+                        return `Mín: ${min} - Máx: ${max}`;
+                      } else if (min) {
+                        return `Mín: ${min}`;
+                      } else if (max) {
+                        return `Máx: ${max}`;
+                      }
+                      return '-';
+                    })()
+                  : '-'
+                }
+              </span>
             </div>
             <div className="flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
-              {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
+              <Clock className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span 
+                className="truncate"
+                title={demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
+              >
+                {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
+              </span>
             </div>
           </div>
 
           <div className="flex items-center justify-between">
             <div className="flex items-center text-sm text-gray-500">
-              <Heart className="h-4 w-4 mr-1" />
-              {demand.interestedProfessionals?.length || 0} interessados
+              <Heart className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span 
+                className="truncate"
+                title={`${demand.interestedProfessionals?.length || 0} interessados`}
+              >
+                {demand.interestedProfessionals?.length || 0} interessados
+              </span>
             </div>
             
             <div className="flex gap-2">
@@ -761,14 +823,11 @@ function OpportunityCard({
               
               {isInterested ? (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onShowInterest(demand.id);
-                  }}
-                  className="flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm"
+                  disabled
+                  className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg cursor-not-allowed text-sm"
                 >
-                  <HeartOff className="h-4 w-4 mr-1" />
-                  Desinteressar-se
+                  <Heart className="h-4 w-4 mr-1 fill-current" />
+                  Interessado
                 </button>
               ) : (
                 <button
@@ -987,10 +1046,10 @@ function DemandDetailsModal({
             {isInterested ? (
               <button
                 disabled
-                className="flex items-center px-4 py-2 bg-gray-100 text-gray-500 rounded-lg cursor-not-allowed"
+                className="flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg cursor-not-allowed"
               >
                 <Heart className="h-4 w-4 mr-2 fill-current" />
-                Interesse Demonstrado
+                Interessado
               </button>
             ) : (
               <button

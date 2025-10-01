@@ -5,7 +5,8 @@ import {
   DemandsApiResponse, 
   Demand, 
   CreateDemandRequest, 
-  UpdateDemandRequest
+  UpdateDemandRequest,
+  ApiResponse
 } from '../types';
 
 export interface DemandsWithCounters {
@@ -30,7 +31,7 @@ export class DemandService extends BaseApiService {
     if (search) {
       params.append('search', search);
     }
-    params.append('ordering', '-created_at');
+    params.append('ordering', '-updated_at');
     
     if (params.toString()) {
       url += `?${params.toString()}`;
@@ -62,9 +63,9 @@ export class DemandService extends BaseApiService {
     let url = API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS;
     const params = new URLSearchParams();
     
-    // Sempre filtrar por status ABERTA e ordenar por data de criação
+    // Sempre filtrar por status ABERTA e ordenar por data de atualização
     params.append('status', 'ABERTA');
-    params.append('ordering', '-created_at');
+    params.append('ordering', '-updated_at');
     
     // Adicionar filtros opcionais
     if (filters?.search) {
@@ -107,7 +108,7 @@ export class DemandService extends BaseApiService {
       clientId: backendDemand.user_created.toString(),
       title: backendDemand.title,
       description: backendDemand.description,
-      serviceType: this.getServiceTypeName(backendDemand.service),
+      serviceType: backendDemand.service_name || this.getServiceTypeName(backendDemand.service),
       deadline: backendDemand.deadline ? new Date(backendDemand.deadline) : null,
       budget: {
         min: parseFloat(backendDemand.min_budget),
@@ -120,7 +121,7 @@ export class DemandService extends BaseApiService {
       },
       status: this.convertStatus(backendDemand.status),
       attachments: [], // Não temos attachments no backend ainda
-      interestedProfessionals: backendDemand.interested_professionals.map(id => id.toString()),
+      interestedProfessionals: backendDemand.interested_professionals || [],
       selectedProfessional: backendDemand.chosen_professional?.toString(),
       createdAt: new Date(backendDemand.created_at),
       updatedAt: new Date(backendDemand.updated_at),
@@ -208,7 +209,7 @@ export class DemandService extends BaseApiService {
   /**
    * Atualiza uma demanda existente
    */
-  async updateDemand(demandId: number, demandData: UpdateDemandRequest): Promise<BackendDemand> {
+  async updateDemand(demandId: number, demandData: UpdateDemandRequest): Promise<ApiResponse<BackendDemand>> {
     const response = await this.makeRequest<BackendDemand>(
       `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/`,
       {
@@ -217,7 +218,7 @@ export class DemandService extends BaseApiService {
       }
     );
     
-    return response.data;
+    return response;
   }
 
   /**
@@ -263,6 +264,46 @@ export class DemandService extends BaseApiService {
     );
     
     return response.data;
+  }
+
+  /**
+   * Demonstra interesse em uma demanda
+   */
+  async showInterest(demandId: number, userId: number): Promise<BackendDemand> {
+    const response = await this.makeRequest<BackendDemand>(
+      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          interested_professionals: [userId]
+        }),
+      }
+    );
+    
+    return response.data;
+  }
+
+  /**
+   * Busca uma demanda específica por ID
+   */
+  async getDemand(demandId: number): Promise<BackendDemand> {
+    const response = await this.makeRequest<BackendDemand>(
+      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/`
+    );
+    
+    return response.data;
+  }
+
+  /**
+   * Deleta um arquivo de uma demanda
+   */
+  async deleteDemandFile(fileId: number): Promise<void> {
+    await this.makeRequest<null>(
+      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMAND_FILES}${fileId}/`,
+      {
+        method: 'DELETE',
+      }
+    );
   }
 }
 

@@ -15,15 +15,17 @@ import {
   Clock, 
   CheckCircle,
   Star,
-  Phone,
-  Award
+  Award,
+  MessageCircle,
+  Phone
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { BRAZILIAN_STATES } from '../../data/locations';
-import { Demand, ProfessionalProfile, Rating, CreateDemandRequest } from '../../types';
+import { Demand, Rating, CreateDemandRequest, InterestedProfessional } from '../../types';
 import { demandService } from '../../services/demandService';
 import { useApiMessage } from '../../hooks/useApiMessage';
 import { userService } from '../../services/userService';
+import { Toast } from '../UI/Toast';
 import { LocationService } from '../../services/locationService';
 
 interface MyDemandsPageProps {
@@ -36,12 +38,40 @@ interface MyDemandsPageProps {
 export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, onStartConversation }: MyDemandsPageProps) {
   const { state, dispatch } = useApp();
   const { showMessage } = useApiMessage();
+  
+  // Funções para toast
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({
+      isVisible: true,
+      message,
+      type
+    });
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  };
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDemandForm, setShowDemandForm] = useState(showCreateForm || false);
   const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
   const [showRatingModal, setShowRatingModal] = useState<{ demandId: string; professionalId: string } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<{ demandId: string; demandTitle: string } | null>(null);
+  const [showDeleteFileModal, setShowDeleteFileModal] = useState<{ fileId: number; fileName: string } | null>(null);
+  
+  // Estado para toast
+  const [toast, setToast] = useState<{
+    isVisible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    isVisible: false,
+    message: '',
+    type: 'success'
+  });
+  const [editingDemand, setEditingDemand] = useState<Demand | null>(null);
+  const [showCandidatesModal, setShowCandidatesModal] = useState<boolean>(false);
+  const [selectedDemandForCandidates, setSelectedDemandForCandidates] = useState<Demand | null>(null);
   const [apiDemands, setApiDemands] = useState<Demand[]>([]);
   const [demandCounters, setDemandCounters] = useState({
     total: 0,
@@ -78,19 +108,12 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
   }>({});
 
   // Estados para notificação
-  const [notification, setNotification] = useState<{
-    show: boolean;
-    message: string;
-    type: 'success' | 'error' | 'info';
-  }>({
-    show: false,
-    message: '',
-    type: 'info'
-  });
 
   // Estados para upload de arquivos
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [existingFiles, setExistingFiles] = useState<{id: number; file: string; created_at: string; updated_at: string; demand: number}[]>([]);
+  const [originalFiles, setOriginalFiles] = useState<{id: number; file: string; created_at: string; updated_at: string; demand: number}[]>([]);
 
   // Estados para opções dos dropdowns
   const [options, setOptions] = useState({
@@ -253,20 +276,79 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
         remote_work_accepted: false,
       };
 
-      // Criar demanda via API
+      if (editingDemand) {
+        // Atualizar demanda existente
+        await demandService.updateDemand(parseInt(editingDemand.id), demandData);
+        
+        // Upload de arquivos novos se houver
+        if (uploadedFiles.length > 0) {
+          try {
+            for (const file of uploadedFiles) {
+              await demandService.uploadDemandFiles(parseInt(editingDemand.id), [file]);
+            }
+          } catch (uploadError) {
+            console.error('Erro ao fazer upload dos novos arquivos:', uploadError);
+            showToast('Demanda atualizada, mas houve erro no upload dos novos arquivos.', 'error');
+          }
+        }
+        
+        // Deletar arquivos que foram removidos
+        const originalFileIds = originalFiles.map(f => f.id);
+        const currentFileIds = existingFiles.map(f => f.id);
+        const filesToDelete = originalFileIds.filter(id => !currentFileIds.includes(id));
+        
+        if (filesToDelete.length > 0) {
+          try {
+            for (const fileId of filesToDelete) {
+              await demandService.deleteDemandFile(fileId);
+            }
+          } catch (deleteError) {
+            console.error('Erro ao deletar arquivos:', deleteError);
+            showToast('Demanda atualizada, mas houve erro ao remover alguns arquivos.', 'error');
+          }
+        }
+        
+        // Recarregar lista de demandas
+        await loadDemands();
+        
+        // Fechar formulário e limpar dados
+        setShowDemandForm(false);
+        setEditingDemand(null);
+        setFormData({
+          title: '',
+          description: '',
+          amount: '',
+          service: '',
+          area: '',
+          specialty: '',
+          tecidType: '',
+          availability: '',
+          deadline: '',
+          budgetMin: '',
+          budgetMax: '',
+          city: '',
+          uf: '',
+        });
+        
+        // Limpar erros e mostrar sucesso
+        setValidationErrors({});
+        setUploadedFiles([]);
+        setFilePreviews([]);
+        setExistingFiles([]);
+        showToast('Demanda atualizada com sucesso!', 'success');
+      } else {
+        // Criar nova demanda
       const createdDemand = await demandService.createDemand(demandData);
       
-      // Upload de arquivos se houver
+        // Upload de arquivos se houver - um por vez
       if (uploadedFiles.length > 0) {
         try {
-          await demandService.uploadDemandFiles(createdDemand.id, uploadedFiles);
+            for (const file of uploadedFiles) {
+              await demandService.uploadDemandFiles(createdDemand.id, [file]);
+            }
         } catch (uploadError) {
           console.error('Erro ao fazer upload dos arquivos:', uploadError);
-          setNotification({
-            show: true,
-            message: 'Demanda criada, mas houve erro no upload dos arquivos.',
-            type: 'error'
-          });
+            showToast('Demanda criada, mas houve erro no upload dos arquivos.', 'error');
         }
       }
       
@@ -295,73 +377,14 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
       setValidationErrors({});
       setUploadedFiles([]);
       setFilePreviews([]);
-      setNotification({
-        show: true,
-        message: 'Demanda criada com sucesso!',
-        type: 'success'
-      });
+        showToast('Demanda criada com sucesso!', 'success');
+      }
     } catch (error) {
       console.error('Erro ao criar demanda:', error);
-      setNotification({
-        show: true,
-        message: 'Erro ao criar demanda. Tente novamente.',
-        type: 'error'
-      });
+      showToast('Erro ao criar demanda. Tente novamente.', 'error');
     }
   };
 
-  const handleSelectProfessional = (demandId: string, professionalId: string) => {
-    const demand = state.demands.find(d => d.id === demandId);
-    if (demand) {
-      const updatedDemand = {
-        ...demand,
-        selectedProfessional: professionalId,
-        status: 'in_progress' as const,
-        updatedAt: new Date(),
-      };
-      dispatch({ type: 'UPDATE_DEMAND', payload: updatedDemand });
-
-      // Notify selected professional
-      const notification = {
-        id: Date.now().toString(),
-        userId: professionalId,
-        type: 'selected' as const,
-        title: 'Você foi selecionado!',
-        message: `Parabéns! Você foi selecionado para o projeto: ${demand.title}`,
-        isRead: false,
-        createdAt: new Date(),
-        demandId: demand.id,
-      };
-      dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-    }
-  };
-
-  const handleRemoveProfessional = (demandId: string) => {
-    const demand = state.demands.find(d => d.id === demandId);
-    if (demand?.selectedProfessional) {
-      const oldProfessionalId = demand.selectedProfessional;
-      const updatedDemand = {
-        ...demand,
-        selectedProfessional: undefined,
-        status: 'open' as const,
-        updatedAt: new Date(),
-      };
-      dispatch({ type: 'UPDATE_DEMAND', payload: updatedDemand });
-
-      // Notify removed professional
-      const notification = {
-        id: Date.now().toString(),
-        userId: oldProfessionalId,
-        type: 'removed' as const,
-        title: 'Profissional removido',
-        message: `Você foi removido do projeto: ${demand.title}`,
-        isRead: false,
-        createdAt: new Date(),
-        demandId: demand.id,
-      };
-      dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-    }
-  };
 
   const handleCompleteDemand = (demandId: string) => {
     const demand = state.demands.find(d => d.id === demandId);
@@ -381,6 +404,63 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
     }
   };
 
+  const handleEditDemand = async (demand: Demand) => {
+    try {
+      // Buscar dados completos da demanda
+      const fullDemandData = await demandService.getDemand(parseInt(demand.id));
+      
+      setEditingDemand(demand);
+      
+      // Preencher o formulário com os dados da demanda
+      setFormData({
+        title: fullDemandData.title,
+        description: fullDemandData.description,
+        amount: fullDemandData.amount.toString(),
+        service: fullDemandData.service.toString(),
+        area: fullDemandData.area.toString(),
+        specialty: fullDemandData.specialty.toString(),
+        tecidType: fullDemandData.tecid_type,
+        availability: fullDemandData.availability.toString(),
+        deadline: fullDemandData.deadline ? new Date(fullDemandData.deadline).toISOString().split('T')[0] : '',
+        budgetMin: fullDemandData.min_budget ? `R$ ${parseFloat(fullDemandData.min_budget).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '',
+        budgetMax: fullDemandData.max_budget ? `R$ ${parseFloat(fullDemandData.max_budget).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '',
+        city: fullDemandData.city,
+        uf: fullDemandData.uf,
+      });
+      
+      // Filtrar áreas baseado no serviço selecionado
+      if (fullDemandData.service) {
+        const selectedService = options.services.find(s => s.id === fullDemandData.service);
+        if (selectedService && selectedService.areas) {
+          setFilteredServiceAreas(selectedService.areas);
+        } else {
+          setFilteredServiceAreas(options.serviceAreas);
+        }
+      }
+      
+      // Carregar cidades se necessário
+      if (fullDemandData.uf) {
+        await loadCitiesByState(fullDemandData.uf);
+      }
+      
+      // Carregar arquivos existentes da demanda
+      try {
+        const files = await demandService.getDemandFiles(parseInt(demand.id));
+        setExistingFiles(files);
+        setOriginalFiles(files); // Salvar cópia dos arquivos originais
+      } catch (error) {
+        console.error('Erro ao carregar arquivos da demanda:', error);
+        setExistingFiles([]);
+        setOriginalFiles([]);
+      }
+      
+      setShowDemandForm(true);
+    } catch (error) {
+      console.error('Erro ao carregar dados da demanda:', error);
+      showMessage('Erro ao carregar dados da demanda. Tente novamente.', 'error');
+    }
+  };
+
   const confirmDeleteDemand = async () => {
     if (!showDeleteModal) return;
     
@@ -392,6 +472,33 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
     } catch (error) {
       console.error('Erro ao excluir demanda:', error);
       showMessage('Erro ao excluir demanda. Tente novamente.', 'error');
+    }
+  };
+
+  // Função para confirmar exclusão de arquivo
+  const confirmDeleteFile = async () => {
+    if (!showDeleteFileModal) return;
+    
+    try {
+      await demandService.deleteDemandFile(showDeleteFileModal.fileId);
+      
+      // Remover arquivo da lista local
+      setExistingFiles((prev: {id: number; file: string; created_at: string; updated_at: string; demand: number}[]) => 
+        prev.filter((file: {id: number; file: string; created_at: string; updated_at: string; demand: number}) => file.id !== showDeleteFileModal.fileId)
+      );
+      
+      // Também remover dos arquivos originais se estiver editando
+      if (editingDemand) {
+        setOriginalFiles((prev: {id: number; file: string; created_at: string; updated_at: string; demand: number}[]) => 
+          prev.filter((file: {id: number; file: string; created_at: string; updated_at: string; demand: number}) => file.id !== showDeleteFileModal.fileId)
+        );
+      }
+      
+      setShowDeleteFileModal(null);
+      showToast('Arquivo excluído com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir arquivo:', error);
+      showToast('Erro ao excluir arquivo. Tente novamente.', 'error');
     }
   };
 
@@ -505,7 +612,6 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                 uf: '',
               });
               setValidationErrors({});
-              setNotification({ show: false, message: '', type: 'info' });
               setShowDemandForm(true);
             }}
             className="bg-pink-600 text-white px-6 py-3 rounded-lg hover:bg-pink-700 transition-colors flex items-center"
@@ -540,28 +646,28 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar demandas..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                loadDemands(e.target.value);
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar demandas..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  loadDemands(e.target.value);
+                }}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                loadDemands('');
               }}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-            />
-          </div>
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              loadDemands('');
-            }}
-            className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Limpar
-          </button>
+              className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Limpar
+            </button>
         </div>
       </div>
 
@@ -611,7 +717,6 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                     uf: '',
                   });
                   setValidationErrors({});
-                  setNotification({ show: false, message: '', type: 'info' });
                   setShowDemandForm(true);
                 }}
                 className="mt-4 bg-pink-600 text-white px-6 py-3 rounded-lg hover:bg-pink-700 transition-colors inline-flex items-center"
@@ -630,19 +735,26 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
             return (
               <div
                 key={demand.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => setSelectedDemand(demand)}
               >
                 {/* Header */}
                 <div className="mb-4">
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-gray-900 text-lg leading-tight pr-2">
+                    <h3 
+                      className="font-semibold text-gray-900 text-lg leading-tight pr-2 truncate" 
+                      title={demand.title}
+                    >
                       {demand.title}
                     </h3>
                     <span className={`px-3 py-1 text-xs rounded-full font-medium whitespace-nowrap ${getStatusColor(demand.status)}`}>
                       {getStatusLabel(demand.status)}
                     </span>
                   </div>
-                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
+                  <p 
+                    className="text-gray-600 text-sm leading-relaxed truncate" 
+                    title={demand.description}
+                  >
                     {demand.description}
                   </p>
                 </div>
@@ -651,7 +763,24 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center text-sm text-gray-600">
                     <DollarSign className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
-                    <span className="font-medium text-green-600">
+                    <span 
+                      className="font-medium text-green-600 truncate"
+                      title={demand.budget.min > 0 || demand.budget.max > 0 
+                        ? (() => {
+                            const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
+                            const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString()}` : '';
+                            if (min && max) {
+                              return `Mín: ${min} - Máx: ${max}`;
+                            } else if (min) {
+                              return `Mín: ${min}`;
+                            } else if (max) {
+                              return `Máx: ${max}`;
+                            }
+                            return '-';
+                          })()
+                        : '-'
+                      }
+                    >
                       {demand.budget.min > 0 || demand.budget.max > 0 
                         ? (() => {
                             const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
@@ -672,12 +801,23 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                   
                   <div className="flex items-center text-sm text-gray-600">
                     <Calendar className="h-4 w-4 mr-2 text-blue-600 flex-shrink-0" />
-                    <span>Prazo: {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}</span>
+                    <span 
+                      className="truncate"
+                      title={`Prazo: ${demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}`}
+                    >
+                      Prazo: {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
+                    </span>
                   </div>
 
                   <div className="flex items-center text-sm text-gray-600">
                     <MapPin className="h-4 w-4 mr-2 text-purple-600 flex-shrink-0" />
-                    <span className="truncate">
+                    <span 
+                      className="truncate"
+                      title={demand.location.city && demand.location.state 
+                        ? `${demand.location.city} - ${demand.location.state}`
+                        : '-'
+                      }
+                    >
                       {demand.location.city && demand.location.state 
                         ? `${demand.location.city} - ${demand.location.state}`
                         : '-'
@@ -688,13 +828,23 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                   {demand.serviceType && (
                     <div className="flex items-center text-sm text-gray-600">
                       <User className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
-                      <span className="truncate">{demand.serviceType}</span>
+                      <span 
+                        className="truncate"
+                        title={demand.serviceType}
+                      >
+                        {demand.serviceType}
+                      </span>
                     </div>
                   )}
 
                   <div className="flex items-center text-sm text-gray-600">
                     <Heart className="h-4 w-4 mr-2 text-red-500 flex-shrink-0" />
-                    <span>{demand.interestedProfessionals.length} profissionais interessados</span>
+                    <span 
+                      className="truncate"
+                      title={`${demand.interestedProfessionals.length} profissionais interessados`}
+                    >
+                      {demand.interestedProfessionals.length} profissionais interessados
+                    </span>
                   </div>
                 </div>
 
@@ -735,7 +885,11 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                 <div className="flex flex-col space-y-2">
                   {demand.status === 'open' && (
                     <button
-                      onClick={() => setSelectedDemand(demand)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDemandForCandidates(demand);
+                        setShowCandidatesModal(true);
+                      }}
                       className="w-full bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium flex items-center justify-center"
                     >
                       <Eye className="h-4 w-4 mr-2" />
@@ -774,14 +928,22 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
 
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <button
-                      onClick={() => setSelectedDemand(demand)}
-                      className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center justify-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditDemand(demand);
+                      }}
+                      className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-200 transition-colors text-sm flex items-center justify-center"
                     >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Detalhes
+                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Editar
                     </button>
                     <button
-                      onClick={() => handleDeleteDemand(demand.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteDemand(demand.id);
+                      }}
                       className="bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors text-sm flex items-center justify-center"
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
@@ -792,7 +954,10 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
 
                 {/* Timestamp */}
                 <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-500">
+                  <p 
+                    className="text-xs text-gray-500 truncate"
+                    title={`Criada em ${new Date(demand.createdAt).toLocaleDateString('pt-BR')}`}
+                  >
                     Criada em {new Date(demand.createdAt).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
@@ -810,12 +975,15 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
           onSubmit={handleSubmit}
           onClose={() => {
             setShowDemandForm(false);
+            setEditingDemand(null);
             setValidationErrors({});
-            setNotification({ show: false, message: '', type: 'info' });
             setUploadedFiles([]);
             setFilePreviews([]);
+            setExistingFiles([]);
+            setOriginalFiles([]);
             onCloseForm?.();
           }}
+          editingDemand={editingDemand}
           options={options}
           filteredServiceAreas={filteredServiceAreas}
           setFilteredServiceAreas={setFilteredServiceAreas}
@@ -824,12 +992,12 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
           loadCitiesByState={loadCitiesByState}
           validationErrors={validationErrors}
           setValidationErrors={setValidationErrors}
-          notification={notification}
-          setNotification={setNotification}
           uploadedFiles={uploadedFiles}
           setUploadedFiles={setUploadedFiles}
           filePreviews={filePreviews}
           setFilePreviews={setFilePreviews}
+          existingFiles={existingFiles}
+          onDeleteFile={(fileId, fileName) => setShowDeleteFileModal({ fileId, fileName })}
         />
       )}
 
@@ -838,13 +1006,11 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
         <DemandDetailsModal
           demand={selectedDemand}
           updatedDemand={state.demands.find(d => d.id === selectedDemand.id) || selectedDemand}
-          interestedProfessionals={selectedDemand.interestedProfessionals.map(id => 
-            state.professionalProfiles.find(p => p.userId === id)
-          ).filter(Boolean) as ProfessionalProfile[]}
           onClose={() => setSelectedDemand(null)}
-          onSelectProfessional={handleSelectProfessional}
-          onRemoveProfessional={handleRemoveProfessional}
-          onStartConversation={onStartConversation}
+          onManageCandidates={(demand) => {
+            setSelectedDemandForCandidates(demand);
+            setShowCandidatesModal(true);
+          }}
         />
       )}
 
@@ -866,6 +1032,364 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
           onCancel={() => setShowDeleteModal(null)}
         />
       )}
+
+      {/* Delete File Confirmation Modal */}
+      {showDeleteFileModal && (
+        <DeleteFileConfirmationModal
+          fileName={showDeleteFileModal.fileName}
+          onConfirm={confirmDeleteFile}
+          onCancel={() => setShowDeleteFileModal(null)}
+        />
+      )}
+      
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
+
+      {/* Modal de Gerenciar Candidatos */}
+      {showCandidatesModal && selectedDemandForCandidates && (
+        <CandidatesModal
+          demand={selectedDemandForCandidates}
+          onClose={() => {
+            setShowCandidatesModal(false);
+            setSelectedDemandForCandidates(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Candidates Modal Component
+interface CandidatesModalProps {
+  demand: Demand;
+  onClose: () => void;
+}
+
+function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
+  const [servicesMap, setServicesMap] = useState<{[key: number]: string}>({});
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [showPhoneModal, setShowPhoneModal] = useState<{professionalName: string} | null>(null);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(demand.selectedProfessional ? parseInt(demand.selectedProfessional) : null);
+  const [isUpdatingSelection, setIsUpdatingSelection] = useState(false);
+  const [toast, setToast] = useState<{
+    isVisible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    isVisible: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Funções para gerenciar toast
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ isVisible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, isVisible: false }));
+    }, 3000);
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({ ...prev, isVisible: false }));
+  };
+
+  // Carregar nomes dos serviços
+  useEffect(() => {
+    const loadServices = async () => {
+      const allServiceIds = new Set<number>();
+      
+      // Coletar todos os IDs de serviços únicos
+      demand.interestedProfessionals.forEach(professional => {
+        professional.services.forEach(serviceId => allServiceIds.add(serviceId));
+      });
+
+      // Buscar nomes dos serviços
+      const servicesData: {[key: number]: string} = {};
+      
+      try {
+        for (const serviceId of allServiceIds) {
+          try {
+            const service = await userService.getServiceById(serviceId);
+            servicesData[serviceId] = service.name;
+          } catch (error) {
+            console.error(`Erro ao buscar serviço ${serviceId}:`, error);
+            servicesData[serviceId] = `Serviço ${serviceId}`;
+          }
+        }
+        setServicesMap(servicesData);
+      } catch (error) {
+        console.error('Erro ao carregar serviços:', error);
+      } finally {
+        setLoadingServices(false);
+      }
+    };
+
+    loadServices();
+  }, [demand.interestedProfessionals]);
+
+  // Função para renderizar estrelas com meia estrela
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        // Estrela cheia
+        stars.push(
+          <Star
+            key={i}
+            className="w-4 h-4 fill-yellow-400 text-yellow-400"
+          />
+        );
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        // Meia estrela
+        stars.push(
+          <div key={i} className="relative w-4 h-4">
+            <Star className="w-4 h-4 text-gray-300" />
+            <div className="absolute inset-0 overflow-hidden w-2">
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+            </div>
+          </div>
+        );
+      } else {
+        // Estrela vazia
+        stars.push(
+          <Star
+            key={i}
+            className="w-4 h-4 text-gray-300"
+          />
+        );
+      }
+    }
+    return stars;
+  };
+
+  // Função para lidar com contato via WhatsApp
+  const handleWhatsAppContact = (professional: InterestedProfessional) => {
+    const professionalName = professional.full_name || 'Profissional';
+    const professionalPhone = professional.cellphone;
+    
+    console.log('Tentando contato WhatsApp:', {
+      name: professionalName,
+      phone: professionalPhone,
+      hasPhone: !!professionalPhone,
+      phoneLength: professionalPhone ? professionalPhone.length : 0
+    });
+    
+    // Verificar se tem telefone válido (não null, undefined ou string vazia)
+    if (professionalPhone && professionalPhone.trim() !== '') {
+      // Abrir WhatsApp
+      const message = `Olá ${professionalName}! Vi seu perfil na VINKO e gostaria de conversar sobre um projeto.`;
+      const whatsappUrl = `https://wa.me/55${professionalPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+      console.log('Abrindo WhatsApp:', whatsappUrl);
+      window.open(whatsappUrl, '_blank');
+    } else {
+      // Mostrar modal de telefone não cadastrado
+      console.log('Mostrando modal - sem telefone:', professionalName);
+      setShowPhoneModal({ professionalName });
+    }
+  };
+
+  // Função para selecionar profissional
+  const handleSelectProfessional = async (professionalId: number) => {
+    if (isUpdatingSelection) return;
+    
+    setIsUpdatingSelection(true);
+    try {
+      const response = await demandService.updateDemand(parseInt(demand.id), {
+        chosen_professional: professionalId,
+        status: "EM ANDAMENTO"
+      });
+      
+      if (response.status === 'success') {
+        setSelectedProfessionalId(professionalId);
+        showToast('Profissional selecionado com sucesso!', 'success');
+      } else {
+        showToast('Erro ao selecionar profissional. Tente novamente.', 'error');
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar profissional:', error);
+      showToast('Erro ao selecionar profissional. Tente novamente.', 'error');
+    } finally {
+      setIsUpdatingSelection(false);
+    }
+  };
+
+  // Função para remover seleção do profissional
+  const handleRemoveSelection = async () => {
+    if (isUpdatingSelection) return;
+    
+    setIsUpdatingSelection(true);
+    try {
+      const response = await demandService.updateDemand(parseInt(demand.id), {
+        chosen_professional: null,
+        status: "ABERTA"
+      });
+      
+      if (response.status === 'success') {
+        setSelectedProfessionalId(null);
+        showToast('Seleção removida com sucesso!', 'success');
+      } else {
+        showToast('Erro ao remover seleção. Tente novamente.', 'error');
+      }
+    } catch (error) {
+      console.error('Erro ao remover seleção:', error);
+      showToast('Erro ao remover seleção. Tente novamente.', 'error');
+    } finally {
+      setIsUpdatingSelection(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Candidatos Interessados ({demand.interestedProfessionals.length})
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          {demand.interestedProfessionals.length === 0 ? (
+            <div className="text-center py-12">
+              <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">Nenhum candidato interessado ainda</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Os profissionais interessados aparecerão aqui quando demonstrarem interesse na sua demanda.
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              {demand.interestedProfessionals.map((professional) => (
+                <div
+                  key={professional.id}
+                  className="flex-shrink-0 bg-white border border-gray-200 rounded-lg p-4 w-80 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {/* Header com Avatar e Nome */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        {professional.full_name || '-'}
+                      </h3>
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className="flex items-center">
+                          {renderStars(professional.rating_avg)}
+                        </div>
+                        <span className="text-sm text-gray-500 ml-1">
+                          ({professional.work_count} trabalhos)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informações do Profissional */}
+                  <div className="space-y-3 mb-4 mt-6">
+                    {/* Serviços */}
+                    <div className="h-8 flex items-center">
+                      {professional.services && professional.services.length > 0 ? (
+                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 w-full">
+                          {professional.services.map((serviceId, index) => (
+                            <span
+                              key={index}
+                              className="flex-shrink-0 bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium"
+                            >
+                              {loadingServices ? 'Carregando...' : (servicesMap[serviceId] || `Serviço ${serviceId}`)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">-</p>
+                      )}
+                    </div>
+                    
+                    {/* Localização */}
+                    <div className="h-6 flex items-center gap-1 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {professional.city && professional.uf 
+                          ? `${professional.city}, ${professional.uf}`
+                          : '-'
+                        }
+                      </span>
+                    </div>
+
+                    {/* Telefone */}
+                    <div className="h-6 flex items-center gap-1 text-sm text-gray-600">
+                      <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {professional.cellphone || '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="flex gap-2">
+                    {selectedProfessionalId === professional.id ? (
+                      <button 
+                        onClick={() => handleRemoveSelection()}
+                        disabled={isUpdatingSelection}
+                        className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUpdatingSelection ? 'Removendo...' : 'Remover'}
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleSelectProfessional(professional.id)}
+                        disabled={isUpdatingSelection || selectedProfessionalId !== null}
+                        className="flex-1 bg-pink-600 text-white px-3 py-2 rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUpdatingSelection ? 'Selecionando...' : 'Selecionar'}
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => handleWhatsAppContact(professional)}
+                      className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center gap-1"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      WhatsApp
+                    </button>
+                    <button className="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="text-sm">Chat</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal de Telefone Não Cadastrado */}
+      {showPhoneModal && (
+        <PhoneNotRegisteredModal
+          professionalName={showPhoneModal.professionalName}
+          onClose={() => setShowPhoneModal(null)}
+        />
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }
@@ -892,6 +1416,7 @@ interface CreateDemandModalProps {
   setFormData: (data: (prev: DemandFormData) => DemandFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  editingDemand?: Demand | null;
   options: {
     services: { id: number; name: string; areas?: { id: number; name: string }[] }[];
     serviceAreas: { id: number; name: string }[];
@@ -921,20 +1446,12 @@ interface CreateDemandModalProps {
     availability?: string;
     budget?: string;
   }) => void;
-  notification: {
-    show: boolean;
-    message: string;
-    type: 'success' | 'error' | 'info';
-  };
-  setNotification: (notification: {
-    show: boolean;
-    message: string;
-    type: 'success' | 'error' | 'info';
-  }) => void;
   uploadedFiles: File[];
   setUploadedFiles: (files: File[]) => void;
   filePreviews: string[];
   setFilePreviews: (previews: string[] | ((prev: string[]) => string[])) => void;
+  existingFiles: {id: number; file: string; created_at: string; updated_at: string; demand: number}[];
+  onDeleteFile: (fileId: number, fileName: string) => void;
 }
 
 function CreateDemandModal({ 
@@ -942,6 +1459,7 @@ function CreateDemandModal({
   setFormData, 
   onSubmit, 
   onClose, 
+  editingDemand,
   options, 
   filteredServiceAreas, 
   setFilteredServiceAreas,
@@ -950,12 +1468,12 @@ function CreateDemandModal({
   loadCitiesByState,
   validationErrors,
   setValidationErrors,
-  notification,
-  setNotification,
   uploadedFiles,
   setUploadedFiles,
   filePreviews,
-  setFilePreviews
+  setFilePreviews,
+  existingFiles,
+  onDeleteFile
 }: CreateDemandModalProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -974,12 +1492,9 @@ function CreateDemandModal({
 
     // Mostrar notificação para arquivos que excedem o limite
     if (oversizedFiles.length > 0) {
-      const fileNames = oversizedFiles.join(', ');
-      setNotification({
-        show: true,
-        message: `Os seguintes arquivos excedem o limite de 20MB: ${fileNames}`,
-        type: 'error'
-      });
+      // Mostrar toast de erro para arquivos grandes
+      // Note: showToast não está disponível aqui, mas o erro será tratado no handleSubmit
+      return; // Não adicionar arquivos grandes
     }
 
     if (validFiles.length > 0) {
@@ -1049,7 +1564,9 @@ function CreateDemandModal({
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold text-gray-900">Nova Demanda</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">
+              {editingDemand ? 'Editar Demanda' : 'Nova Demanda'}
+            </h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
               <X className="h-6 w-6" />
             </button>
@@ -1057,46 +1574,6 @@ function CreateDemandModal({
         </div>
 
         <form onSubmit={(e) => { console.log('Form submit'); onSubmit(e); }} className="p-6 space-y-6">
-          {/* Notificação */}
-          {notification.show && (
-            <div className={`p-4 rounded-lg border-l-4 ${
-              notification.type === 'success' 
-                ? 'bg-green-50 border-green-400 text-green-700' 
-                : notification.type === 'error'
-                ? 'bg-red-50 border-red-400 text-red-700'
-                : 'bg-blue-50 border-blue-400 text-blue-700'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {notification.type === 'success' && (
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                  {notification.type === 'error' && (
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                  {notification.type === 'info' && (
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                  <span className="font-medium">{notification.message}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNotification({ show: false, message: '', type: 'info' })}
-                  className="ml-4 text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Título - Obrigatório */}
@@ -1430,10 +1907,63 @@ function CreateDemandModal({
                   </div>
                 </label>
               </div>
-              {/* Área para previews dos arquivos */}
+              {/* Área para arquivos existentes */}
+              {existingFiles.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-3">Arquivos anexados:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {existingFiles.map((file) => {
+                      const fileName = file.file.split('/').pop() || 'Arquivo';
+                      const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+                      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+                      
+                      return (
+                        <div 
+                          key={file.id} 
+                          className="relative w-16 h-16 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm cursor-pointer"
+                          title={fileName}
+                          onClick={() => window.open(file.file, '_blank')}
+                        >
+                          {isImage ? (
+                            <img 
+                              src={file.file} 
+                              alt={fileName}
+                              className="w-full h-full object-cover rounded-lg hover:scale-150 transition-transform duration-200"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg hover:scale-150 transition-transform duration-200">
+                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteFile(file.id, fileName);
+                            }}
+                            className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600 shadow-sm z-20"
+                          >
+                            <X size={10} />
+                          </button>
+                          <div 
+                            className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate rounded-b-lg"
+                            title={fileName}
+                          >
+                            {fileName.length > 12 ? fileName.substring(0, 12) + '...' : fileName}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Área para previews dos arquivos novos */}
               {uploadedFiles.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-sm text-gray-600 mb-3">Arquivos selecionados:</p>
+                  <p className="text-sm text-gray-600 mb-3">Novos arquivos selecionados:</p>
                   <div className="flex flex-wrap gap-1">
                     {uploadedFiles.map((file, index) => (
                       <div 
@@ -1461,7 +1991,10 @@ function CreateDemandModal({
                         >
                           <X size={10} />
                         </button>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate rounded-b-lg">
+                        <div 
+                          className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate rounded-b-lg"
+                          title={file.name}
+                        >
                           {file.name.length > 12 ? file.name.substring(0, 12) + '...' : file.name}
                         </div>
                       </div>
@@ -1518,7 +2051,7 @@ function CreateDemandModal({
               onClick={() => console.log('Botão clicado')}
               className="flex-1 px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors"
             >
-              Publicar Demanda
+              {editingDemand ? 'Atualizar Demanda' : 'Publicar Demanda'}
             </button>
           </div>
         </form>
@@ -1531,29 +2064,18 @@ function CreateDemandModal({
 interface DemandDetailsModalProps {
   demand: Demand;
   updatedDemand: Demand;
-  interestedProfessionals: ProfessionalProfile[];
   onClose: () => void;
-  onSelectProfessional: (demandId: string, professionalId: string) => void;
-  onRemoveProfessional: (demandId: string) => void;
-  onStartConversation?: (userId: string, demandId?: string) => void;
+  onManageCandidates: (demand: Demand) => void;
 }
 
 function DemandDetailsModal({ 
   demand, 
   updatedDemand,
-  interestedProfessionals, 
-  onClose, 
-  onSelectProfessional, 
-  onRemoveProfessional, 
-  onStartConversation 
+  onClose,
+  onManageCandidates
 }: DemandDetailsModalProps) {
-  const { state } = useApp();
   const [demandFiles, setDemandFiles] = useState<{id: number; file: string; created_at: string; updated_at: string; demand: number}[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
-
-  const selectedProfessional = updatedDemand.selectedProfessional 
-    ? state.professionalProfiles.find(p => p.userId === updatedDemand.selectedProfessional)
-    : null;
 
   // Carregar arquivos da demanda
   useEffect(() => {
@@ -1572,24 +2094,19 @@ function DemandDetailsModal({
     loadDemandFiles();
   }, [demand.id]);
 
-  const handleContactWhatsApp = (professional: ProfessionalProfile) => {
-    const phone = professional.contact.whatsapp || professional.contact.phone;
-    if (phone) {
-      const message = `Olá ${professional.name}! Vi que você tem interesse na demanda "${demand.title}" na VINKO. Gostaria de conversar sobre o projeto.`;
-      const whatsappUrl = `https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
-    } else {
-      alert('Informações de WhatsApp não disponíveis');
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">{demand.title}</h2>
+             <div className="flex-1 min-w-0 pr-4">
+               <h2 
+                 className="text-2xl font-semibold text-gray-900 mb-2 overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100" 
+                 title={demand.title}
+               >
+                 {demand.title}
+               </h2>
               <span className={`px-3 py-1 text-sm rounded-full font-medium ${
                 demand.status === 'open' ? 'bg-green-100 text-green-800' :
                 demand.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
@@ -1601,28 +2118,27 @@ function DemandDetailsModal({
                  demand.status === 'completed' ? 'Concluída' : 'Cancelada'}
               </span>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
               <X className="h-6 w-6" />
             </button>
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Demand Info */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="p-6 space-y-6">
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Descrição do Projeto</h3>
-                <p className="text-gray-600 leading-relaxed">{demand.description}</p>
+                <div className="bg-gray-50 rounded-lg p-4 max-h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                  <p className="text-gray-600 leading-relaxed">{demand.description}</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
+                <div className="bg-green-50 rounded-lg p-4 border border-green-100">
                   <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
                     <DollarSign className="h-5 w-5 mr-2 text-green-600" />
                     Orçamento
                   </h3>
-                  <p className="text-lg font-medium text-green-600">
+                  <p className={demand.budget.min > 0 || demand.budget.max > 0 ? "text-lg font-medium text-green-600" : "text-gray-500 text-sm"}>
                     {demand.budget.min > 0 || demand.budget.max > 0 
                       ? (() => {
                           const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
@@ -1634,49 +2150,57 @@ function DemandDetailsModal({
                           } else if (max) {
                             return `Máx: ${max}`;
                           }
-                          return '-';
+                          return 'Nenhum orçamento informado';
                         })()
-                      : '-'
+                      : 'Nenhum orçamento informado'
                     }
                   </p>
                 </div>
 
-                <div>
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                   <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
                     <Calendar className="h-5 w-5 mr-2 text-blue-600" />
                     Prazo
                   </h3>
-                  <p className="text-gray-600">
+                  <p className={demand.deadline ? "text-gray-600" : "text-gray-500 text-sm"}>
                     {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR', {
                       day: '2-digit',
                       month: 'long',
                       year: 'numeric'
-                    }) : '-'}
+                    }) : 'Nenhum prazo informado'}
                   </p>
                 </div>
               </div>
 
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                  <MapPin className="h-5 w-5 mr-2 text-purple-600" />
-                  Localização
-                </h3>
-                <p className="text-gray-600">
-                  {demand.location.city}, {demand.location.state}
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-orange-600" />
+                    Localização
+                  </h3>
+                  <p className={demand.location.city && demand.location.state ? "text-gray-600" : "text-gray-500 text-sm"}>
+                    {demand.location.city && demand.location.state 
+                      ? `${demand.location.city}, ${demand.location.state}`
+                      : 'Nenhuma localização informada'
+                    }
+                  </p>
+                </div>
+
+                {demand.serviceType && (
+                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                      <User className="h-5 w-5 mr-2 text-purple-600" />
+                      Tipo de Serviço
+                    </h3>
+                    <span className="px-3 py-1 bg-white text-purple-800 rounded-full border border-purple-200">
+                      {demand.serviceType}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {demand.serviceType && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Tipo de Serviço</h3>
-                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full">
-                    {demand.serviceType}
-                  </span>
-                </div>
-              )}
-
               {/* Arquivos Anexados */}
-              <div>
+              <div className="bg-pink-50 rounded-lg p-4 border border-pink-100">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                   <svg className="h-5 w-5 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -1690,14 +2214,9 @@ function DemandDetailsModal({
                     <span className="ml-2 text-gray-600">Carregando arquivos...</span>
                   </div>
                 ) : demandFiles.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <svg className="h-12 w-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p className="text-gray-500">Nenhum arquivo anexado</p>
-                  </div>
+                  <p className="text-gray-500 text-sm">Nenhum arquivo anexado</p>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                     {demandFiles.map((file) => {
                       const fileName = file.file.split('/').pop() || 'Arquivo';
                       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
@@ -1706,7 +2225,7 @@ function DemandDetailsModal({
                       return (
                         <div 
                           key={file.id} 
-                          className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer group"
+                          className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer group flex-shrink-0 w-24"
                           onClick={() => window.open(file.file, '_blank')}
                         >
                           <div className="flex flex-col items-center text-center">
@@ -1714,17 +2233,17 @@ function DemandDetailsModal({
                               <img 
                                 src={file.file} 
                                 alt={fileName}
-                                className="w-12 h-12 object-cover rounded-lg mb-2 group-hover:scale-105 transition-transform"
+                                className="w-10 h-10 object-cover rounded-lg mb-2 group-hover:scale-105 transition-transform"
                               />
                             ) : (
-                              <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-pink-200 transition-colors">
-                                <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-pink-200 transition-colors">
+                                <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                               </div>
                             )}
                             <p className="text-xs text-gray-600 truncate w-full" title={fileName}>
-                              {fileName.length > 15 ? fileName.substring(0, 15) + '...' : fileName}
+                              {fileName.length > 12 ? fileName.substring(0, 12) + '...' : fileName}
                             </p>
                             <p className="text-xs text-gray-400 mt-1">
                               {new Date(file.created_at).toLocaleDateString('pt-BR')}
@@ -1735,73 +2254,28 @@ function DemandDetailsModal({
                     })}
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Professionals */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Profissionais Interessados ({interestedProfessionals.length})
-              </h3>
-
-              {selectedProfessional && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-green-900">Profissional Selecionado</h4>
-                    <button
-                      onClick={() => onRemoveProfessional(updatedDemand.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remover
-                    </button>
-                  </div>
-                  <ProfessionalCard
-                    professional={selectedProfessional}
-                    isSelected={true}
-                    onSelect={() => {}}
-                    onContact={() => handleContactWhatsApp(selectedProfessional)}
-                    onStartConversation={() => onStartConversation?.(selectedProfessional.userId, updatedDemand.id)}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {interestedProfessionals.length === 0 ? (
-                  <div className="text-center py-8">
-                    <User className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">Nenhum profissional interessado ainda</p>
-                  </div>
-                ) : (
-                  interestedProfessionals
-                    .filter(p => p.userId !== updatedDemand.selectedProfessional)
-                    .map((professional) => (
-                      <ProfessionalCard
-                        key={professional.id}
-                        professional={professional}
-                        isSelected={false}
-                        onSelect={() => onSelectProfessional(updatedDemand.id, professional.userId)}
-                        onContact={() => handleContactWhatsApp(professional)}
-                        onStartConversation={() => onStartConversation?.(professional.userId, updatedDemand.id)}
-                      />
-                    ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+               </div>
+             </div>
 
         <div className="p-6 border-t border-gray-200">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              Criada em {new Date(updatedDemand.createdAt).toLocaleDateString('pt-BR')}
+              Criada em {new Date(demand.createdAt).toLocaleDateString('pt-BR')} | Atualizada em {new Date(demand.updatedAt).toLocaleDateString('pt-BR')}
             </div>
-            <button
-              onClick={onClose}
-              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Fechar
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => onManageCandidates(updatedDemand)}
+                className="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors"
+              >
+                Gerenciar candidatos ({updatedDemand.interestedProfessionals.length})
+              </button>
+              <button
+                onClick={onClose}
+                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1809,88 +2283,6 @@ function DemandDetailsModal({
   );
 }
 
-// Professional Card Component
-interface ProfessionalCardProps {
-  professional: ProfessionalProfile;
-  isSelected: boolean;
-  onSelect: () => void;
-  onContact: () => void;
-  onStartConversation: () => void;
-}
-
-function ProfessionalCard({ professional, isSelected, onSelect, onContact, onStartConversation }: ProfessionalCardProps) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-            <User className="h-5 w-5 text-purple-600" />
-          </div>
-          <div>
-            <p className="font-medium text-gray-900">{professional.name}</p>
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-3 w-3 ${
-                      i < Math.floor(professional.rating)
-                        ? 'text-yellow-500 fill-current'
-                        : 'text-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-gray-600">
-                ({professional.completedJobs} trabalhos)
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <p className="text-sm text-gray-600 mb-3">{professional.specialty}</p>
-
-      <div className="text-xs text-gray-500 mb-3">
-        <div className="flex items-center mb-1">
-          <MapPin className="h-3 w-3 mr-1" />
-          {professional.city}, {professional.uf}
-        </div>
-        {professional.contact.phone && (
-          <div className="flex items-center">
-            <Phone className="h-3 w-3 mr-1" />
-            {professional.contact.phone}
-          </div>
-        )}
-      </div>
-
-      <div className="flex space-x-2">
-        {!isSelected && (
-          <button
-            onClick={onSelect}
-            className="flex-1 bg-pink-600 text-white px-3 py-2 rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium"
-          >
-            Selecionar
-          </button>
-        )}
-        <button
-          onClick={onContact}
-          className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center"
-        >
-          <Phone className="h-3 w-3 mr-1" />
-          WhatsApp
-        </button>
-        <button
-          onClick={onStartConversation}
-          className="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center"
-        >
-          <MessageSquare className="h-3 w-3 mr-1" />
-          Chat
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // Delete Confirmation Modal Component
 interface DeleteConfirmationModalProps {
@@ -1916,6 +2308,54 @@ function DeleteConfirmationModal({ demandTitle, onConfirm, onCancel }: DeleteCon
           
           <p className="text-gray-700 mb-6">
             Tem certeza que deseja excluir a demanda <strong>"{demandTitle}"</strong>?
+          </p>
+          
+          <div className="flex space-x-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Delete File Confirmation Modal Component
+interface DeleteFileConfirmationModalProps {
+  fileName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function DeleteFileConfirmationModal({ fileName, onConfirm, onCancel }: DeleteFileConfirmationModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="p-6">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+              <Trash2 className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Excluir Arquivo</h3>
+              <p className="text-sm text-gray-600">Esta ação não pode ser desfeita</p>
+            </div>
+          </div>
+          
+          <p className="text-gray-700 mb-6">
+            Tem certeza que deseja excluir o arquivo <strong title={fileName} className="cursor-help">
+              "{fileName.length > 50 ? fileName.substring(0, 50) + '...' : fileName}"
+            </strong>?
           </p>
           
           <div className="flex space-x-3">
@@ -2038,6 +2478,41 @@ function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingM
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// Modal de Telefone Não Cadastrado
+interface PhoneNotRegisteredModalProps {
+  professionalName: string;
+  onClose: () => void;
+}
+
+function PhoneNotRegisteredModal({ professionalName, onClose }: PhoneNotRegisteredModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Phone className="h-8 w-8 text-yellow-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Telefone não cadastrado
+          </h3>
+          <p className="text-gray-600 mb-6">
+            O profissional <span className="font-medium">{professionalName}</span> não possui telefone cadastrado para WhatsApp.
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            Você pode tentar entrar em contato através do botão "Chat" ou aguardar até que o profissional atualize suas informações de contato.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full bg-pink-500 text-white py-3 px-4 rounded-lg hover:bg-pink-600 transition-colors font-medium"
+          >
+            Entendi
+          </button>
+        </div>
       </div>
     </div>
   );

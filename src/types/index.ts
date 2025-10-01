@@ -209,6 +209,66 @@ export interface ClientProfile {
   createdAt: Date;
 }
 
+// Tipos para profissionais interessados
+export interface InterestedProfessional {
+  id: number;
+  services: number[];
+  areas: number[];
+  work_count: number;
+  password: string;
+  last_login: string | null;
+  is_superuser: boolean;
+  username: string;
+  first_name: string;
+  last_name: string;
+  is_staff: boolean;
+  is_active: boolean;
+  date_joined: string;
+  created_at: string;
+  updated_at: string;
+  user_type: string;
+  email: string;
+  full_name: string;
+  is_email_verified: boolean;
+  is_user_test: boolean;
+  birth_date: string;
+  cellphone: string | null;
+  postal_code: string;
+  city: string;
+  uf: string;
+  neighborhood: string;
+  street: string;
+  number: string;
+  complement: string;
+  company_size: string;
+  cnpj: string;
+  cpf: string;
+  corporate_name: string;
+  trade_name: string;
+  company_cep: string;
+  company_city: string;
+  company_uf: string;
+  company_neighborhood: string;
+  company_street: string;
+  company_number: string;
+  company_complement: string | null;
+  company_cellphone: string | null;
+  company_email: string;
+  tecid_type: string | null;
+  year_experience: number | null;
+  daily_production_capacity: number | null;
+  min_required_production: number | null;
+  max_required_production: number | null;
+  rating_avg: number;
+  rating_count: number;
+  about_me: string | null;
+  availability: number | null;
+  groups: any[];
+  user_permissions: any[];
+  specialties: number[];
+  machines: number[];
+}
+
 // Tipos para demandas do backend
 export interface BackendDemand {
   id: number;
@@ -234,7 +294,8 @@ export interface BackendDemand {
   area: number;
   specialty: number;
   chosen_professional: number | null;
-  interested_professionals: number[];
+  interested_professionals: InterestedProfessional[];
+  service_name?: string;
 }
 
 export interface DemandsApiResponse {
@@ -283,6 +344,8 @@ export interface UpdateDemandRequest {
   min_budget?: number;
   max_budget?: number;
   remote_work_accepted?: boolean;
+  chosen_professional?: number | null;
+  status?: "ABERTA" | "EM ANDAMENTO" | "CONCLUIDA";
 }
 
 export interface CreateDemandApiResponse extends ApiResponse<BackendDemand> {}
@@ -308,7 +371,7 @@ export interface Demand {
   };
   status: 'open' | 'in_progress' | 'completed' | 'cancelled';
   attachments: string[];
-  interestedProfessionals: string[];
+  interestedProfessionals: InterestedProfessional[];
   selectedProfessional?: string;
   createdAt: Date;
   updatedAt: Date;

@@ -31,7 +31,7 @@ export class DemandService extends BaseApiService {
     if (search) {
       params.append('search', search);
     }
-    params.append('ordering', '-updated_at');
+    params.append('ordering', '-created_at');
     
     if (params.toString()) {
       url += `?${params.toString()}`;
@@ -65,7 +65,7 @@ export class DemandService extends BaseApiService {
     
     // Sempre filtrar por status ABERTA e ordenar por data de atualização
     params.append('status', 'ABERTA');
-    params.append('ordering', '-updated_at');
+    params.append('ordering', '-created_at');
     
     // Adicionar filtros opcionais
     if (filters?.search) {
@@ -125,11 +125,16 @@ export class DemandService extends BaseApiService {
       selectedProfessional: backendDemand.chosen_professional?.toString(),
       createdAt: new Date(backendDemand.created_at),
       updatedAt: new Date(backendDemand.updated_at),
+      // Novos campos adicionados
+      area: backendDemand.area_name || this.getAreaName(backendDemand.area),
+      specialty: backendDemand.specialty_name || this.getSpecialtyName(backendDemand.specialty),
+      tecidType: backendDemand.tecid_type,
+      amount: backendDemand.amount,
+      availability: backendDemand.availability_name || this.getAvailabilityName(backendDemand.availability),
+      // Campos do backend preservados
+      user_cellphone: backendDemand.user_cellphone,
+      user_full_name: backendDemand.user_full_name,
     };
-
-    // Preservar campos extras do backend
-    (frontendDemand as any).user_cellphone = backendDemand.user_cellphone;
-    (frontendDemand as any).user_full_name = backendDemand.user_full_name;
 
     console.log('Convertendo demanda:', {
       id: backendDemand.id,
@@ -180,6 +185,51 @@ export class DemandService extends BaseApiService {
     };
     
     return serviceTypes[serviceId] || '-';
+  }
+
+  private getAreaName(areaId: number): string {
+    // Mapeamento temporário - deve ser substituído por uma busca real
+    const areas: Record<number, string> = {
+      1: 'Tecnologia da Informação',
+      2: 'Marketing e Publicidade',
+      3: 'Design e Arte',
+      4: 'Engenharia',
+      5: 'Arquitetura',
+      6: 'Consultoria',
+      7: 'Educação',
+      8: 'Saúde',
+      9: 'Jurídico',
+      10: 'Financeiro',
+    };
+    
+    return areas[areaId] || '-';
+  }
+
+  private getSpecialtyName(specialtyId: number): string {
+    // Mapeamento temporário - deve ser substituído por uma busca real
+    const specialties: Record<number, string> = {
+      1: 'Especialização A',
+      2: 'Especialização B',
+      3: 'Especialização C',
+      4: 'Especialização D',
+      5: 'Especialização E',
+    };
+    
+    return specialties[specialtyId] || '-';
+  }
+
+  private getAvailabilityName(availabilityId: number): string {
+    // Mapeamento temporário - deve ser substituído por uma busca real
+    const availabilities: Record<number, string> = {
+      1: 'Imediato',
+      2: '1 semana',
+      3: '2 semanas',
+      4: '1 mês',
+      5: '2 meses',
+      6: '3 meses',
+    };
+    
+    return availabilities[availabilityId] || '-';
   }
 
   /**

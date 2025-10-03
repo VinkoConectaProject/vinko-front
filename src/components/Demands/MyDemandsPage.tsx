@@ -813,15 +813,29 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                     <MapPin className="h-4 w-4 mr-2 text-purple-600 flex-shrink-0" />
                     <span 
                       className="truncate"
-                      title={demand.location.city && demand.location.state 
-                        ? `${demand.location.city} - ${demand.location.state}`
-                        : '-'
-                      }
+                      title={(() => {
+                        const { city, state } = demand.location;
+                        if (city && state) {
+                          return `${city}, ${state}`;
+                        } else if (city) {
+                          return city;
+                        } else if (state) {
+                          return state;
+                        }
+                        return '-';
+                      })()}
                     >
-                      {demand.location.city && demand.location.state 
-                        ? `${demand.location.city} - ${demand.location.state}`
-                        : '-'
-                      }
+                      {(() => {
+                        const { city, state } = demand.location;
+                        if (city && state) {
+                          return `${city}, ${state}`;
+                        } else if (city) {
+                          return city;
+                        } else if (state) {
+                          return state;
+                        }
+                        return '-';
+                      })()}
                     </span>
                   </div>
 
@@ -1010,6 +1024,10 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
           onManageCandidates={(demand) => {
             setSelectedDemandForCandidates(demand);
             setShowCandidatesModal(true);
+          }}
+          onEdit={(demand) => {
+            setSelectedDemand(null);
+            handleEditDemand(demand);
           }}
         />
       )}
@@ -1248,7 +1266,7 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Candidatos Interessados ({demand.interestedProfessionals.length})
@@ -2066,13 +2084,15 @@ interface DemandDetailsModalProps {
   updatedDemand: Demand;
   onClose: () => void;
   onManageCandidates: (demand: Demand) => void;
+  onEdit: (demand: Demand) => void;
 }
 
 function DemandDetailsModal({ 
   demand, 
   updatedDemand,
-  onClose,
-  onManageCandidates
+  onClose, 
+  onManageCandidates,
+  onEdit
 }: DemandDetailsModalProps) {
   const [demandFiles, setDemandFiles] = useState<{id: number; file: string; created_at: string; updated_at: string; demand: number}[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -2097,7 +2117,7 @@ function DemandDetailsModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-start">
              <div className="flex-1 min-w-0 pr-4">
@@ -2128,17 +2148,17 @@ function DemandDetailsModal({
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Descrição do Projeto</h3>
                 <div className="bg-gray-50 rounded-lg p-4 max-h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                  <p className="text-gray-600 leading-relaxed">{demand.description}</p>
+                <p className="text-gray-600 leading-relaxed">{demand.description}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-green-50 rounded-lg p-4 border border-green-100">
                   <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                    <DollarSign className="h-5 w-5 mr-2 text-green-600" />
+                    <DollarSign className="h-4 w-4 mr-2 text-green-600" />
                     Orçamento
                   </h3>
-                  <p className={demand.budget.min > 0 || demand.budget.max > 0 ? "text-lg font-medium text-green-600" : "text-gray-500 text-sm"}>
+                  <p className={demand.budget.min > 0 || demand.budget.max > 0 ? "text-sm font-medium text-green-600" : "text-gray-500 text-xs"}>
                     {demand.budget.min > 0 || demand.budget.max > 0 
                       ? (() => {
                           const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
@@ -2159,44 +2179,105 @@ function DemandDetailsModal({
 
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                   <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                    <Calendar className="h-5 w-5 mr-2 text-blue-600" />
+                    <Calendar className="h-4 w-4 mr-2 text-blue-600" />
                     Prazo
                   </h3>
-                  <p className={demand.deadline ? "text-gray-600" : "text-gray-500 text-sm"}>
+                  <p className={demand.deadline ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
                     {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR', {
                       day: '2-digit',
                       month: 'long',
                       year: 'numeric'
                     }) : 'Nenhum prazo informado'}
                   </p>
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+                <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <MapPin className="h-4 w-4 mr-2 text-orange-600" />
+                  Localização
+                </h3>
+                  <p className={demand.location.city || demand.location.state ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {(() => {
+                      const { city, state } = demand.location;
+                      if (city && state) {
+                        return `${city}, ${state}`;
+                      } else if (city) {
+                        return city;
+                      } else if (state) {
+                        return state;
+                      }
+                      return 'Nenhuma localização informada';
+                    })()}
+                </p>
+              </div>
+
+                <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
                   <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                    <MapPin className="h-5 w-5 mr-2 text-orange-600" />
-                    Localização
+                    <User className="h-4 w-4 mr-2 text-purple-600" />
+                    Tipo de Serviço
                   </h3>
-                  <p className={demand.location.city && demand.location.state ? "text-gray-600" : "text-gray-500 text-sm"}>
-                    {demand.location.city && demand.location.state 
-                      ? `${demand.location.city}, ${demand.location.state}`
-                      : 'Nenhuma localização informada'
-                    }
+                  <p className={demand.serviceType ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {demand.serviceType || 'Nenhum tipo de serviço informado'}
                   </p>
                 </div>
 
-                {demand.serviceType && (
-                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                    <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                      <User className="h-5 w-5 mr-2 text-purple-600" />
-                      Tipo de Serviço
-                    </h3>
-                    <span className="px-3 py-1 bg-white text-purple-800 rounded-full border border-purple-200">
-                      {demand.serviceType}
-                    </span>
-                  </div>
-                )}
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <svg className="h-4 w-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    Área de Atuação
+                  </h3>
+                  <p className={demand.area ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {demand.area || 'Nenhuma área de atuação informada'}
+                  </p>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <svg className="h-4 w-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Especialidade
+                  </h3>
+                  <p className={demand.specialty ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {demand.specialty || 'Nenhuma especialidade informada'}
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <svg className="h-4 w-4 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    Tipo de Tecido
+                  </h3>
+                  <p className={demand.tecidType ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {demand.tecidType || 'Nenhum tipo de tecido informado'}
+                  </p>
+                </div>
+
+                <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <svg className="h-4 w-4 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                    </svg>
+                    Quantidade
+                  </h3>
+                  <p className={demand.amount ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {demand.amount ? demand.amount.toLocaleString('pt-BR') : 'Nenhuma quantidade informada'}
+                  </p>
+                </div>
+
+                <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <Clock className="h-4 w-4 mr-2 text-red-600" />
+                    Disponibilidade
+                  </h3>
+                  <p className={demand.availability ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                    {demand.availability || 'Nenhuma disponibilidade informada'}
+                  </p>
+                </div>
               </div>
 
               {/* Arquivos Anexados */}
@@ -2254,8 +2335,8 @@ function DemandDetailsModal({
                     })}
                   </div>
                 )}
-               </div>
-             </div>
+          </div>
+        </div>
 
         <div className="p-6 border-t border-gray-200">
           <div className="flex justify-between items-center">
@@ -2270,11 +2351,17 @@ function DemandDetailsModal({
                 Gerenciar candidatos ({updatedDemand.interestedProfessionals.length})
               </button>
               <button
-                onClick={onClose}
-                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                onClick={() => onEdit(updatedDemand)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Fechar
+                Editar
               </button>
+            <button
+              onClick={onClose}
+              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Fechar
+            </button>
             </div>
           </div>
         </div>
@@ -2299,30 +2386,30 @@ function DeleteConfirmationModal({ demandTitle, onConfirm, onCancel }: DeleteCon
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
               <Trash2 className="h-6 w-6 text-red-600" />
-            </div>
-            <div>
+          </div>
+          <div>
               <h3 className="text-lg font-semibold text-gray-900">Excluir Demanda</h3>
               <p className="text-sm text-gray-600">Esta ação não pode ser desfeita</p>
-            </div>
-          </div>
-          
+        </div>
+      </div>
+
           <p className="text-gray-700 mb-6">
             Tem certeza que deseja excluir a demanda <strong>"{demandTitle}"</strong>?
           </p>
           
           <div className="flex space-x-3">
-            <button
+          <button
               onClick={onCancel}
               className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-            >
+          >
               Cancelar
-            </button>
-            <button
+          </button>
+        <button
               onClick={onConfirm}
               className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Excluir
-            </button>
+        </button>
           </div>
         </div>
       </div>

@@ -296,6 +296,9 @@ export interface BackendDemand {
   chosen_professional: number | null;
   interested_professionals: InterestedProfessional[];
   service_name?: string;
+  specialty_name?: string;
+  area_name?: string;
+  availability_name?: string;
 }
 
 export interface DemandsApiResponse {
@@ -375,6 +378,15 @@ export interface Demand {
   selectedProfessional?: string;
   createdAt: Date;
   updatedAt: Date;
+  // Novos campos adicionados
+  area?: string;
+  specialty?: string;
+  tecidType?: "AMBOS" | "MALHA" | "PLANO";
+  amount?: number;
+  availability?: string;
+  // Campos do backend preservados
+  user_cellphone?: string;
+  user_full_name?: string;
 }
 
 export interface Notification {

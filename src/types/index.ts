@@ -212,8 +212,8 @@ export interface ClientProfile {
 // Tipos para profissionais interessados
 export interface InterestedProfessional {
   id: number;
-  services: number[];
-  areas: number[];
+  services: string[];
+  areas: string[];
   work_count: number;
   password: string;
   last_login: string | null;
@@ -287,7 +287,7 @@ export interface BackendDemand {
   min_budget: string;
   max_budget: string;
   remote_work_accepted: boolean;
-  status: "ABERTA" | "EM ANDAMENTO" | "CONCLUIDA";
+  status: "ABERTA" | "EM ANDAMENTO" | "CONCLUÍDA";
   user_created: number;
   availability: number;
   service: number;
@@ -299,6 +299,8 @@ export interface BackendDemand {
   specialty_name?: string;
   area_name?: string;
   availability_name?: string;
+  interested_professionals_count?: number;
+  finalized_at?: string;
 }
 
 export interface DemandsApiResponse {
@@ -348,7 +350,9 @@ export interface UpdateDemandRequest {
   max_budget?: number;
   remote_work_accepted?: boolean;
   chosen_professional?: number | null;
-  status?: "ABERTA" | "EM ANDAMENTO" | "CONCLUIDA";
+  chosen_professional_id?: number | null;
+  status?: "ABERTA" | "EM ANDAMENTO" | "CONCLUÍDA";
+  finalized_at?: string;
 }
 
 export interface CreateDemandApiResponse extends ApiResponse<BackendDemand> {}
@@ -378,6 +382,7 @@ export interface Demand {
   selectedProfessional?: string;
   createdAt: Date;
   updatedAt: Date;
+  finalizedAt?: Date;
   // Novos campos adicionados
   area?: string;
   specialty?: string;
@@ -387,6 +392,7 @@ export interface Demand {
   // Campos do backend preservados
   user_cellphone?: string;
   user_full_name?: string;
+  interested_professionals_count?: number;
 }
 
 export interface Notification {

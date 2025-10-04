@@ -28,13 +28,13 @@ export const ApiMessage: React.FC<ApiMessageProps> = ({
   const getBgColor = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-100 border-green-300';
       case 'error':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-100 border-red-300';
       case 'info':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-100 border-blue-300';
       default:
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-100 border-blue-300';
     }
   };
 
@@ -52,23 +52,25 @@ export const ApiMessage: React.FC<ApiMessageProps> = ({
   };
 
   return (
-    <div className={`${getBgColor()} border rounded-lg p-4 shadow-lg mb-4`}>
-      <div className="flex items-start space-x-3">
-        <div className="flex-shrink-0">
-          {getIcon()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium ${getTextColor()}`}>
-            {message}
-          </p>
-        </div>
-        <div className="flex-shrink-0">
-          <button
-            onClick={onClose}
-            className={`${getTextColor()} hover:opacity-75 transition-opacity`}
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <div className="fixed top-4 right-4 z-50 max-w-sm w-auto mx-4">
+      <div className={`${getBgColor()} border rounded-lg p-4 shadow-lg`}>
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            {getIcon()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-medium ${getTextColor()}`}>
+              {message}
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

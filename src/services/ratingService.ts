@@ -15,6 +15,7 @@ export interface CreateRatingRequest {
   professional: number;
   score: number;
   comment?: string;
+  demand?: number;
 }
 
 export interface UpdateRatingRequest {
@@ -61,10 +62,20 @@ export class RatingService extends BaseApiService {
    */
   async getRatingByClientProfessional(
     clientId: number, 
-    professionalId: number
+    professionalId: number,
+    demandId?: number
   ): Promise<ApiResponse<GetRatingByClientProfessionalResponse>> {
+    const params = new URLSearchParams({
+      client_id: clientId.toString(),
+      professional_id: professionalId.toString()
+    });
+    
+    if (demandId) {
+      params.append('demand_id', demandId.toString());
+    }
+    
     return this.makeRequest<GetRatingByClientProfessionalResponse>(
-      `${this.baseUrl}/get_by_client_professional/?client_id=${clientId}&professional_id=${professionalId}`
+      `${this.baseUrl}/get_by_client_professional/?${params.toString()}`
     );
   }
 

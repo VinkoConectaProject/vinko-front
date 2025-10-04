@@ -6,6 +6,7 @@ import { demandService } from '../../services/demandService';
 import { userService } from '../../services/userService';
 import { LocationService } from '../../services/locationService';
 import { useApiMessage } from '../../hooks/useApiMessage';
+import { ApiMessage } from '../UI/ApiMessage';
 
 interface OpportunitiesPageProps {
   onStartConversation?: (otherUserId: string, demandId?: string, initialMessage?: string) => void;
@@ -37,7 +38,7 @@ interface SearchFilters {
 
 export default function OpportunitiesPage({ onStartConversation }: OpportunitiesPageProps) {
   const { state, dispatch } = useApp();
-  const { showMessage } = useApiMessage();
+  const { apiMessage, showMessage, hideMessage } = useApiMessage();
   
   // Estados para dados da API
   const [opportunities, setOpportunities] = useState<Demand[]>([]);
@@ -267,15 +268,33 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
       }
 
       // Chamar API para demonstrar interesse
-      await demandService.showInterest(parseInt(demandId), currentUser.id);
+      const updatedDemand = await demandService.showInterest(parseInt(demandId), currentUser.id);
       
-      // Atualizar a lista de oportunidades para refletir a mudança
-      await loadOpportunities();
+      // Atualizar a demanda específica na lista local
+      setOpportunities(prevOpportunities => 
+        prevOpportunities.map(demand => 
+          demand.id === demandId 
+            ? { 
+                ...demand, 
+                interestedProfessionals: [
+                  ...(demand.interestedProfessionals || []), 
+                  { id: parseInt(currentUser.id), full_name: currentUser.full_name || 'Usuário' }
+                ]
+              }
+            : demand
+        )
+      );
       
       showMessage('Interesse demonstrado com sucesso!', 'success');
     } catch (error) {
       console.error('Erro ao demonstrar interesse:', error);
-      showMessage('Erro ao demonstrar interesse. Tente novamente.', 'error');
+      
+      // Verificar se é um erro específico da API
+      if (error instanceof Error && error.message.includes('Você só pode se adicionar como interessado')) {
+        showMessage('Você só pode se adicionar como interessado.', 'error');
+      } else {
+        showMessage('Erro ao demonstrar interesse. Tente novamente.', 'error');
+      }
     }
   };
 
@@ -284,7 +303,14 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
     
     // Verificar se o usuário atual está na lista de profissionais interessados
     const demand = opportunities.find(d => d.id === demandId);
-    return demand?.interestedProfessionals?.includes(currentUser.id.toString()) || false;
+    if (!demand?.interestedProfessionals || !Array.isArray(demand.interestedProfessionals)) {
+      return false;
+    }
+    
+    // Verificar se o ID do usuário atual está na lista de profissionais interessados
+    return demand.interestedProfessionals.some((professional: any) => 
+      professional.id === parseInt(currentUser.id)
+    );
   };
 
   const clearFilters = async () => {
@@ -665,6 +691,15 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
           onClose={() => setShowPhoneModal(null)}
         />
       )}
+      
+      {/* ApiMessage para mostrar notificações */}
+      {apiMessage.show && (
+        <ApiMessage
+          message={apiMessage.message}
+          type={apiMessage.type}
+          onClose={hideMessage}
+        />
+      )}
     </div>
   );
 }
@@ -954,7 +989,16 @@ function DemandDetailsModal({
                  demand.status === 'completed' ? 'Concluída' : 'Cancelada'}
               </span>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            
+            {/* Seção de Profissionais Interessados */}
+            <div className="flex items-center mx-4 bg-gray-50 rounded-lg px-3 py-2">
+              <Heart className="h-4 w-4 mr-1 text-gray-500" />
+              <span className="text-sm text-gray-500">
+                {demand.interested_professionals_count || 0} profissionais interessados
+              </span>
+            </div>
+            
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-2">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -1191,7 +1235,6 @@ function DemandDetailsModal({
                 <button
                   onClick={() => {
                     onShowInterest(demand.id);
-                    onClose();
                   }}
                   className="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors flex items-center gap-2 whitespace-nowrap"
                 >

@@ -134,6 +134,8 @@ export class DemandService extends BaseApiService {
       // Campos do backend preservados
       user_cellphone: backendDemand.user_cellphone,
       user_full_name: backendDemand.user_full_name,
+      interested_professionals_count: backendDemand.interested_professionals_count,
+      finalizedAt: backendDemand.finalized_at ? new Date(backendDemand.finalized_at) : undefined,
     };
 
     console.log('Convertendo demanda:', {
@@ -155,7 +157,7 @@ export class DemandService extends BaseApiService {
         return 'open';
       case 'EM ANDAMENTO':
         return 'in_progress';
-      case 'CONCLUIDA':
+      case 'CONCLUÍDA':
         return 'completed';
       default:
         return 'cancelled';
@@ -242,6 +244,34 @@ export class DemandService extends BaseApiService {
   }
 
   /**
+   * Busca demandas para "Meus Trabalhos" com filtros específicos
+   */
+  async getMyJobs(status?: string, chosenProfessional?: number, interestedProfessional?: number): Promise<DemandsWithCounters> {
+    const params = new URLSearchParams();
+    
+    if (status) {
+      params.append('status', status);
+    }
+    
+    if (chosenProfessional) {
+      params.append('chosen_professional', chosenProfessional.toString());
+    }
+    
+    if (interestedProfessional) {
+      params.append('interested_professionals', interestedProfessional.toString());
+    }
+    
+    params.append('ordering', '-created_at');
+    
+    const url = params.toString() 
+      ? `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}?${params.toString()}`
+      : API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS;
+    
+    const response = await this.makeRequest<DemandsWithCounters>(url);
+    return response.data;
+  }
+
+  /**
    * Cria uma nova demanda
    */
   async createDemand(demandData: CreateDemandRequest): Promise<BackendDemand> {
@@ -325,7 +355,7 @@ export class DemandService extends BaseApiService {
       {
         method: 'PATCH',
         body: JSON.stringify({
-          interested_professionals: [userId]
+          interested_professionals_ids: [userId]
         }),
       }
     );
@@ -360,8 +390,40 @@ export class DemandService extends BaseApiService {
    * Busca o profissional selecionado para uma demanda específica
    */
   async getChosenProfessional(demandId: number): Promise<any> {
-    const response = await this.makeRequest<any>(
-      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/chosen-professional/`
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Token de acesso não encontrado');
+    }
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/chosen-professional/`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (response.status === 404) {
+      throw new Error('Profissional não encontrado');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  }
+
+  /**
+   * Busca profissionais interessados em uma demanda específica
+   */
+  async getInterestedProfessionals(demandId: number): Promise<any[]> {
+    const response = await this.makeRequest<any[]>(
+      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/interested-professionals/`
     );
     return response.data;
   }

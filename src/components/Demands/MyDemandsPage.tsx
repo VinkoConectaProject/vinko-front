@@ -21,11 +21,12 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { BRAZILIAN_STATES } from '../../data/locations';
-import { Demand, CreateDemandRequest, InterestedProfessional } from '../../types';
+import { Demand, CreateDemandRequest, UpdateDemandRequest, InterestedProfessional, ProfessionalSearchResult } from '../../types';
 import { demandService } from '../../services/demandService';
 import { useApiMessage } from '../../hooks/useApiMessage';
 import { userService } from '../../services/userService';
 import { Toast } from '../UI/Toast';
+import { ApiMessage } from '../UI/ApiMessage';
 import { LocationService } from '../../services/locationService';
 import { ProfessionalProfileModal } from '../UI/ProfessionalProfileModal';
 import { ratingService } from '../../services/ratingService';
@@ -39,7 +40,7 @@ interface MyDemandsPageProps {
 
 export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, onStartConversation }: MyDemandsPageProps) {
   const { state } = useApp();
-  const { showMessage } = useApiMessage();
+  const { apiMessage, showMessage, hideMessage } = useApiMessage();
   
   // Funções para toast
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -57,7 +58,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
   const [searchTerm, setSearchTerm] = useState('');
   const [showDemandForm, setShowDemandForm] = useState(showCreateForm || false);
   const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
-  const [showRatingModal, setShowRatingModal] = useState<{ demandId: string; professionalId: string } | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState<{ demandId: string; professionalId: string; professionalName?: string } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<{ demandId: string; demandTitle: string } | null>(null);
   const [showDeleteFileModal, setShowDeleteFileModal] = useState<{ fileId: number; fileName: string } | null>(null);
   const [showProfessionalModal, setShowProfessionalModal] = useState<boolean>(false);
@@ -561,56 +562,16 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
     }
   };
 
-  const handleSubmitRating = async (rating: number, comment: string) => {
+  const handleSubmitRating = async () => {
     if (!showRatingModal) return;
     
-    const { professionalId } = showRatingModal;
-    
     try {
-      // Criar avaliação via API
-      const currentUserId = state.currentUser?.id ? parseInt(state.currentUser.id) : null;
-      if (!currentUserId) {
-        showMessage('Erro: usuário não identificado.', 'error');
-        return;
-      }
-
-      // Buscar avaliação existente
-      const existingRatingResponse = await ratingService.getRatingByClientProfessional(
-        currentUserId,
-        parseInt(professionalId)
-      );
-
-      let response;
-      if (existingRatingResponse.status === 'success' && existingRatingResponse.data?.id) {
-        // Atualizar avaliação existente
-        response = await ratingService.updateRating(existingRatingResponse.data.id, {
-          score: rating,
-          comment: comment || undefined
-        });
-      } else {
-        // Criar nova avaliação
-        response = await ratingService.createRating({
-          professional: parseInt(professionalId),
-          score: rating,
-          comment: comment || undefined
-        });
-      }
-
-      if (response.status === 'success') {
-        showMessage('Avaliação enviada com sucesso!', 'success');
-        
-        // Finalizar demanda via API se há uma pendente
-        if (pendingFinalization) {
-          await handleFinalizeAfterRating(pendingFinalization);
-        }
-        
-        setShowRatingModal(null);
-      } else {
-        showMessage('Erro ao enviar avaliação. Tente novamente.', 'error');
-      }
+      // Finalizar demanda via API
+      await handleFinalizeAfterRating(showRatingModal.demandId);
+      setShowRatingModal(null);
     } catch (error) {
-      console.error('Erro ao enviar avaliação:', error);
-      showMessage('Erro ao enviar avaliação. Tente novamente.', 'error');
+      console.error('Erro ao finalizar demanda:', error);
+      showMessage('Erro ao finalizar demanda. Tente novamente.', 'error');
     }
   };
 
@@ -693,7 +654,8 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
       // Abrir o modal de avaliação
       setShowRatingModal({ 
         demandId: demandId, 
-        professionalId: professionalData.id.toString() 
+        professionalId: professionalData.id.toString(),
+        professionalName: professionalData.full_name
       });
     } catch (error) {
       console.error('Erro ao carregar dados do profissional para finalização:', error);
@@ -703,15 +665,19 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
 
   const handleFinalizeAfterRating = async (demandId: string) => {
     try {
+      // Obter data atual no formato 'yyyy-mm-dd'
+      const currentDate = new Date().toISOString().split('T')[0];
+      
       const response = await demandService.updateDemand(parseInt(demandId), {
-        status: 'CONCLUIDA'
-      });
+        status: 'CONCLUÍDA',
+        finalized_at: currentDate
+      } as UpdateDemandRequest & { finalized_at: string });
 
       if (response.status === 'success') {
         showMessage('Demanda finalizada com sucesso!', 'success');
         // Recarregar demandas para atualizar o frontend
         await loadDemands();
-      } else {
+    } else {
         showMessage('Erro ao finalizar demanda. Tente novamente.', 'error');
       }
     } catch (error) {
@@ -1213,7 +1179,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                   )}
 
                   {demand.status === 'in_progress' && !demand.selectedProfessional && (
-                    <button
+                      <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedDemandForCandidates(demand);
@@ -1223,7 +1189,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                     >
                       <Eye className="h-4 w-4 mr-2" />
                       Gerenciar ({demand.interestedProfessionals.length} candidatos)
-                    </button>
+                      </button>
                   )}
 
 
@@ -1232,7 +1198,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
                       <CheckCircle className="h-6 w-6 text-blue-600 mx-auto mb-1" />
                       <p className="text-sm font-medium text-blue-900">Projeto Concluído</p>
                       <p className="text-xs text-blue-700">
-                        Finalizado em {new Date(demand.updatedAt).toLocaleDateString('pt-BR')}
+                        Finalizado em {demand.finalizedAt ? demand.finalizedAt.toLocaleDateString('pt-BR') : new Date(demand.updatedAt).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
                   )}
@@ -1333,8 +1299,14 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
       {showRatingModal && (
         <RatingModal
           professionalId={showRatingModal.professionalId}
-          demandTitle={state.demands.find(d => d.id === showRatingModal.demandId)?.title || ''}
+          demandId={showRatingModal.demandId}
+          demandTitle={apiDemands.find(d => d.id === showRatingModal.demandId)?.title || ''}
+          professionalName={showRatingModal.professionalName}
           onSubmit={handleSubmitRating}
+          onRatingSuccess={() => {
+            // Avaliação foi salva com sucesso, agora o botão Finalizar está habilitado
+            console.log('Avaliação salva com sucesso, botão Finalizar habilitado');
+          }}
           onClose={() => {
             setShowRatingModal(null);
             // Cancelar finalização pendente se o modal for fechado sem avaliar
@@ -1378,6 +1350,20 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
           onClose={() => {
             setShowCandidatesModal(false);
             setSelectedDemandForCandidates(null);
+          }}
+          onProfessionalSelectionChange={(demandId, selectedProfessionalId) => {
+            // Atualizar o estado das demandas para refletir a mudança
+            setApiDemands((prevDemands: Demand[]) => 
+              prevDemands.map((demand: Demand) => 
+                demand.id === demandId 
+                  ? {
+                      ...demand,
+                      selectedProfessional: selectedProfessionalId ? selectedProfessionalId.toString() : undefined,
+                      status: selectedProfessionalId ? 'in_progress' : 'open'
+                    }
+                  : demand
+              )
+            );
           }}
         />
       )}
@@ -1424,6 +1410,15 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
           currentUserId={state.currentUser?.id ? parseInt(state.currentUser.id) : undefined}
         />
       )}
+
+      {/* ApiMessage para mostrar notificações */}
+      {apiMessage.show && (
+        <ApiMessage
+          message={apiMessage.message}
+          type={apiMessage.type}
+          onClose={hideMessage}
+        />
+      )}
     </div>
   );
 }
@@ -1432,14 +1427,38 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
 interface CandidatesModalProps {
   demand: Demand;
   onClose: () => void;
+  onProfessionalSelectionChange?: (demandId: string, selectedProfessionalId: number | null) => void;
 }
 
-function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
-  const [servicesMap, setServicesMap] = useState<{[key: number]: string}>({});
-  const [loadingServices, setLoadingServices] = useState(true);
+function CandidatesModal({ demand, onClose, onProfessionalSelectionChange }: CandidatesModalProps) {
+  const [interestedProfessionals, setInterestedProfessionals] = useState<InterestedProfessional[]>([]);
+  const [loadingProfessionals, setLoadingProfessionals] = useState(true);
   const [showPhoneModal, setShowPhoneModal] = useState<{professionalName: string} | null>(null);
-  const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(demand.selectedProfessional ? parseInt(demand.selectedProfessional) : null);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null);
   const [isUpdatingSelection, setIsUpdatingSelection] = useState(false);
+  const [showProfessionalModal, setShowProfessionalModal] = useState(false);
+  const [selectedProfessionalData, setSelectedProfessionalData] = useState<{
+    id: number;
+    full_name: string;
+    services: string[];
+    areas: string[];
+    specialties: number[];
+    tecid_type: string;
+    uf: string;
+    city: string;
+    email: string;
+    availability: string | number;
+    cellphone: string;
+    company_cellphone: string;
+    about_me: string;
+    year_experience: number;
+    rating_avg: number;
+    rating_count: number;
+    work_count: number;
+  } | null>(null);
+  const [showProfessionalRatingModal, setShowProfessionalRatingModal] = useState(false);
+  const [professionalRatingRefresh, setProfessionalRatingRefresh] = useState(0);
+  const [candidateCardsRefresh, setCandidateCardsRefresh] = useState(0);
   const [toast, setToast] = useState<{
     isVisible: boolean;
     message: string;
@@ -1462,39 +1481,217 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
 
-  // Carregar nomes dos serviços
-  useEffect(() => {
-    const loadServices = async () => {
-      const allServiceIds = new Set<number>();
-      
-      // Coletar todos os IDs de serviços únicos
-      demand.interestedProfessionals.forEach(professional => {
-        professional.services.forEach(serviceId => allServiceIds.add(serviceId));
-      });
+  // Função para lidar com avaliação de profissional
+  const handleRateProfessional = () => {
+    setShowProfessionalRatingModal(true);
+  };
 
-      // Buscar nomes dos serviços
-      const servicesData: {[key: number]: string} = {};
-      
-      try {
-        for (const serviceId of allServiceIds) {
-          try {
-            const service = await userService.getServiceById(serviceId);
-            servicesData[serviceId] = service.name;
-          } catch (error) {
-            console.error(`Erro ao buscar serviço ${serviceId}:`, error);
-            servicesData[serviceId] = `Serviço ${serviceId}`;
-          }
+  // Função para submeter avaliação
+  const handleProfessionalRatingSubmit = async (rating: number, comment: string) => {
+    if (!selectedProfessionalData) return;
+    
+    try {
+      // Verificar se já existe uma avaliação do usuário para este profissional
+      const currentUserId = parseInt(demand.clientId); // ID do cliente que criou a demanda
+      if (!currentUserId) {
+        showToast('Erro: usuário não identificado.', 'error');
+        return;
+      }
+
+      // Buscar avaliação existente
+      const existingRatingResponse = await ratingService.getRatingByClientProfessional(
+        currentUserId,
+        selectedProfessionalData.id
+      );
+
+      let response;
+      if (existingRatingResponse.status === 'success' && existingRatingResponse.data?.id) {
+        // Atualizar avaliação existente (PATCH)
+        response = await ratingService.updateRating(existingRatingResponse.data.id, {
+          score: rating,
+          comment: comment
+        });
+      } else {
+        // Criar nova avaliação (POST)
+        response = await ratingService.createRating({
+          professional: selectedProfessionalData.id,
+          score: rating,
+          comment: comment
+        });
+      }
+
+      if (response.status === 'success') {
+        showToast('Avaliação enviada com sucesso!', 'success');
+        setShowProfessionalRatingModal(false);
+        // Forçar refresh das avaliações
+        setProfessionalRatingRefresh(prev => prev + 1);
+        // Forçar refresh dos cards dos candidatos
+        setCandidateCardsRefresh(prev => prev + 1);
+        // Recarregar dados do profissional para atualizar rating_avg e rating_count
+        await refreshProfessionalData();
+      } else {
+        showToast('Erro ao enviar avaliação. Tente novamente.', 'error');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar avaliação:', error);
+      showToast('Erro ao enviar avaliação. Tente novamente.', 'error');
+    }
+  };
+
+  // Função para atualizar dados do profissional após mudança nas avaliações
+  const refreshProfessionalData = async () => {
+    if (!selectedProfessionalData) return;
+    
+    try {
+      // Carregar as avaliações e calcular a média diretamente
+      const ratingsResponse = await ratingService.getRatingsByProfessional(selectedProfessionalData.id);
+      if (ratingsResponse.status === 'success' && ratingsResponse.data) {
+        const ratings = ratingsResponse.data;
+        const averageRating = ratings.length > 0 
+          ? ratings.reduce((sum, rating) => sum + rating.score, 0) / ratings.length 
+          : 0;
+        
+        // Atualizar os dados do profissional
+        setSelectedProfessionalData(prev => prev ? {
+          ...prev,
+          rating_avg: averageRating,
+          rating_count: ratings.length
+        } : null);
+
+        // Atualizar também o card do candidato correspondente
+        updateCandidateCardRating(selectedProfessionalData.id, averageRating, ratings.length);
+      }
+    } catch (ratingError) {
+      console.error('Erro ao carregar avaliações para atualização:', ratingError);
+    }
+  };
+
+  // Função para atualizar as estrelas do card do candidato
+  const updateCandidateCardRating = (professionalId: number, newRatingAvg: number, newRatingCount: number) => {
+    setInterestedProfessionals(prev => 
+      prev.map(professional => 
+        professional.id === professionalId 
+          ? {
+              ...professional,
+              rating_avg: newRatingAvg,
+              rating_count: newRatingCount
+            }
+          : professional
+      )
+    );
+  };
+
+  // Função para deletar avaliação
+  const handleProfessionalRatingDelete = async () => {
+    if (!selectedProfessionalData) return;
+    
+    try {
+      // Verificar se já existe uma avaliação do usuário para este profissional
+      const currentUserId = parseInt(demand.clientId); // ID do cliente que criou a demanda
+      if (!currentUserId) {
+        showToast('Erro: usuário não identificado.', 'error');
+        return;
+      }
+
+      // Buscar avaliação existente
+      const existingRatingResponse = await ratingService.getRatingByClientProfessional(
+        currentUserId,
+        selectedProfessionalData.id
+      );
+
+      if (existingRatingResponse.status === 'success' && existingRatingResponse.data?.id) {
+        // Deletar avaliação existente (DELETE)
+        const response = await ratingService.deleteRating(existingRatingResponse.data.id);
+        
+        if (response.status === 'success') {
+          showToast('Avaliação removida com sucesso!', 'success');
+          setShowProfessionalRatingModal(false);
+          // Forçar refresh das avaliações
+          setProfessionalRatingRefresh(prev => prev + 1);
+          // Forçar refresh dos cards dos candidatos
+          setCandidateCardsRefresh(prev => prev + 1);
+          // Recarregar dados do profissional para atualizar rating_avg e rating_count
+          await refreshProfessionalData();
+        } else {
+          showToast('Erro ao remover avaliação. Tente novamente.', 'error');
         }
-        setServicesMap(servicesData);
+      } else {
+        showToast('Nenhuma avaliação encontrada para remover.', 'error');
+      }
+          } catch (error) {
+      console.error('Erro ao remover avaliação:', error);
+      showToast('Erro ao remover avaliação. Tente novamente.', 'error');
+    }
+  };
+
+  // Função para lidar com clique no card do profissional
+  const handleProfessionalCardClick = async (professional: InterestedProfessional) => {
+    try {
+      // Converter os dados do profissional para o formato esperado pelo modal
+      const professionalData = {
+        id: professional.id,
+        full_name: professional.full_name,
+        services: professional.services,
+        areas: professional.areas,
+        specialties: professional.specialties || [],
+        tecid_type: professional.tecid_type || '',
+        uf: professional.uf || '',
+        city: professional.city || '',
+        email: professional.email,
+        availability: typeof professional.availability === 'string' 
+          ? parseInt(professional.availability) || 1 
+          : professional.availability || 1,
+        cellphone: professional.cellphone || '',
+        company_cellphone: professional.company_cellphone || '',
+        about_me: professional.about_me || '',
+        year_experience: professional.year_experience || 0,
+        rating_avg: professional.rating_avg || 0,
+        rating_count: professional.rating_count || 0,
+        work_count: professional.work_count || 0
+      };
+      
+      setSelectedProfessionalData(professionalData);
+      setShowProfessionalModal(true);
+    } catch (error) {
+      console.error('Erro ao abrir modal do profissional:', error);
+    }
+  };
+
+  // Função para verificar qual profissional está selecionado
+  const checkSelectedProfessional = useCallback(async () => {
+    try {
+      const selectedProfessional = await demandService.getChosenProfessional(parseInt(demand.id));
+      setSelectedProfessionalId(selectedProfessional.id);
+    } catch {
+      // Se não há profissional selecionado, o endpoint retorna 404
+      setSelectedProfessionalId(null);
+    }
+  }, [demand.id]);
+
+  // Carregar profissionais interessados atualizados
+  useEffect(() => {
+    const loadInterestedProfessionals = async () => {
+      try {
+        setLoadingProfessionals(true);
+        const professionals = await demandService.getInterestedProfessionals(parseInt(demand.id));
+        setInterestedProfessionals(professionals);
       } catch (error) {
-        console.error('Erro ao carregar serviços:', error);
+        console.error('Erro ao carregar profissionais interessados:', error);
+        // Em caso de erro, usar os dados da demanda original
+        setInterestedProfessionals(demand.interestedProfessionals);
       } finally {
-        setLoadingServices(false);
+        setLoadingProfessionals(false);
       }
     };
 
-    loadServices();
-  }, [demand.interestedProfessionals]);
+    loadInterestedProfessionals();
+  }, [demand.id, demand.interestedProfessionals]);
+
+  // Verificar profissional selecionado quando o modal abrir
+  useEffect(() => {
+    checkSelectedProfessional();
+  }, [checkSelectedProfessional]);
+
 
   // Função para renderizar estrelas com meia estrela
   const renderStars = (rating: number) => {
@@ -1567,13 +1764,15 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
     setIsUpdatingSelection(true);
     try {
       const response = await demandService.updateDemand(parseInt(demand.id), {
-        chosen_professional: professionalId,
+        chosen_professional_id: professionalId,
         status: "EM ANDAMENTO"
       });
       
       if (response.status === 'success') {
         setSelectedProfessionalId(professionalId);
         showToast('Profissional selecionado com sucesso!', 'success');
+        // Notificar o componente pai sobre a mudança
+        onProfessionalSelectionChange?.(demand.id, professionalId);
       } else {
         showToast('Erro ao selecionar profissional. Tente novamente.', 'error');
       }
@@ -1592,19 +1791,21 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
     setIsUpdatingSelection(true);
     try {
       const response = await demandService.updateDemand(parseInt(demand.id), {
-        chosen_professional: null,
+        chosen_professional_id: null,
         status: "ABERTA"
       });
       
       if (response.status === 'success') {
         setSelectedProfessionalId(null);
-        showToast('Seleção removida com sucesso!', 'success');
+        showToast('Profissional removido com sucesso!', 'success');
+        // Notificar o componente pai sobre a mudança
+        onProfessionalSelectionChange?.(demand.id, null);
       } else {
-        showToast('Erro ao remover seleção. Tente novamente.', 'error');
+        showToast('Erro ao remover profissional. Tente novamente.', 'error');
       }
     } catch (error) {
       console.error('Erro ao remover seleção:', error);
-      showToast('Erro ao remover seleção. Tente novamente.', 'error');
+      showToast('Erro ao remover profissional. Tente novamente.', 'error');
     } finally {
       setIsUpdatingSelection(false);
     }
@@ -1612,10 +1813,10 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
-            Candidatos Interessados ({demand.interestedProfessionals.length})
+            Candidatos Interessados ({interestedProfessionals.length})
           </h2>
           <button
             onClick={onClose}
@@ -1626,7 +1827,14 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          {demand.interestedProfessionals.length === 0 ? (
+          {loadingProfessionals ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="h-8 w-8 text-gray-400 animate-spin" />
+              </div>
+              <p className="text-gray-500 text-lg">Carregando candidatos...</p>
+            </div>
+          ) : interestedProfessionals.length === 0 ? (
             <div className="text-center py-12">
               <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 text-lg">Nenhum candidato interessado ainda</p>
@@ -1636,10 +1844,15 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
             </div>
           ) : (
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              {demand.interestedProfessionals.map((professional) => (
+              {interestedProfessionals.map((professional) => (
                 <div
-                  key={professional.id}
-                  className="flex-shrink-0 bg-white border border-gray-200 rounded-lg p-4 w-80 shadow-sm hover:shadow-md transition-shadow"
+                  key={`${professional.id}-${professional.rating_avg}-${professional.rating_count}-${candidateCardsRefresh}`}
+                  onClick={() => handleProfessionalCardClick(professional)}
+                  className={`flex-shrink-0 border rounded-lg p-4 w-80 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
+                    selectedProfessionalId === professional.id 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-white border-gray-200'
+                  }`}
                 >
                   {/* Header com Avatar e Nome */}
                   <div className="flex items-start gap-3 mb-3">
@@ -1667,12 +1880,12 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
                     <div className="h-8 flex items-center">
                       {professional.services && professional.services.length > 0 ? (
                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 w-full">
-                          {professional.services.map((serviceId, index) => (
+                          {(professional.services as string[]).map((serviceName: string, index: number) => (
                             <span
                               key={index}
                               className="flex-shrink-0 bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium"
                             >
-                              {loadingServices ? 'Carregando...' : (servicesMap[serviceId] || `Serviço ${serviceId}`)}
+                              {serviceName}
                             </span>
                           ))}
                         </div>
@@ -1705,7 +1918,10 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
                   <div className="flex gap-2">
                     {selectedProfessionalId === professional.id ? (
                       <button 
-                        onClick={() => handleRemoveSelection()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveSelection();
+                        }}
                         disabled={isUpdatingSelection}
                         className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -1713,7 +1929,10 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
                       </button>
                     ) : (
                       <button 
-                        onClick={() => handleSelectProfessional(professional.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectProfessional(professional.id);
+                        }}
                         disabled={isUpdatingSelection || selectedProfessionalId !== null}
                         className="flex-1 bg-pink-600 text-white px-3 py-2 rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -1721,13 +1940,23 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
                       </button>
                     )}
                     <button 
-                      onClick={() => handleWhatsAppContact(professional)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleWhatsAppContact(professional);
+                      }}
                       className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center gap-1"
                     >
                       <MessageSquare className="w-4 h-4" />
                       WhatsApp
                     </button>
-                    <button className="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // TODO: Implementar funcionalidade de chat
+                        console.log('Chat com profissional:', professional.id);
+                      }}
+                      className="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1"
+                    >
                       <MessageCircle className="w-4 h-4" />
                       <span className="text-sm">Chat</span>
                     </button>
@@ -1754,6 +1983,32 @@ function CandidatesModal({ demand, onClose }: CandidatesModalProps) {
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
+
+      {/* Modal do Profissional Selecionado */}
+      {showProfessionalModal && selectedProfessionalData && (
+        <ProfessionalProfileModal
+          isOpen={showProfessionalModal}
+          onClose={() => setShowProfessionalModal(false)}
+          professional={{
+            ...selectedProfessionalData,
+            specialties: selectedProfessionalData.specialties.map(String),
+            availability: typeof selectedProfessionalData.availability === 'number' 
+              ? selectedProfessionalData.availability 
+              : 1,
+            year_experience: selectedProfessionalData.year_experience.toString()
+          } as ProfessionalSearchResult}
+          onStartConversation={(professionalId) => {
+            console.log('Iniciar conversa com profissional:', professionalId);
+          }}
+          onRateProfessional={handleRateProfessional}
+          showRatingModal={showProfessionalRatingModal}
+          onCloseRatingModal={() => setShowProfessionalRatingModal(false)}
+          onRatingSubmit={handleProfessionalRatingSubmit}
+          onRatingDelete={handleProfessionalRatingDelete}
+          refreshTrigger={professionalRatingRefresh}
+          currentUserId={parseInt(demand.clientId)}
+        />
+      )}
     </div>
   );
 }
@@ -2814,31 +3069,161 @@ function DeleteFileConfirmationModal({ fileName, onConfirm, onCancel }: DeleteFi
 // Rating Modal Component
 interface RatingModalProps {
   professionalId: string;
+  demandId: string;
   demandTitle: string;
-  onSubmit: (rating: number, comment: string) => void;
+  professionalName?: string;
+  onSubmit: () => void;
   onClose: () => void;
+  onRatingSuccess?: () => void;
 }
 
-function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingModalProps) {
+function RatingModal({ professionalId, demandId, demandTitle, professionalName, onSubmit, onClose, onRatingSuccess }: RatingModalProps) {
   const { state } = useApp();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [hoveredRating, setHoveredRating] = useState(0);
+  const [existingRating, setExistingRating] = useState<{
+    id?: number;
+    score?: number;
+    comment?: string;
+    professional?: number;
+    client?: number;
+  } | null>(null);
+  const [loadingRating, setLoadingRating] = useState(true);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [showRatingMessage, setShowRatingMessage] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({ show: false, message: '', type: 'success' });
 
   const professional = state.professionalProfiles.find(p => p.userId === professionalId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Carregar avaliação existente quando o modal abrir
+  useEffect(() => {
+    const loadExistingRating = async () => {
+      try {
+        setLoadingRating(true);
+        const currentUserId = state.currentUser?.id ? parseInt(state.currentUser.id) : null;
+        
+        if (currentUserId && professionalId && demandId) {
+          const response = await ratingService.getRatingByClientProfessional(
+            currentUserId, 
+            parseInt(professionalId),
+            parseInt(demandId)
+          );
+          
+          if (response.status === 'success' && response.data && Object.keys(response.data).length > 0) {
+            // Se há uma avaliação existente
+            setExistingRating(response.data);
+            setRating(response.data.score || 0);
+            setComment(response.data.comment || '');
+          } else {
+            // Se não há avaliação existente
+            setExistingRating(null);
+            setRating(0);
+            setComment('');
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar avaliação existente:', error);
+        setExistingRating(null);
+        setRating(0);
+        setComment('');
+      } finally {
+        setLoadingRating(false);
+      }
+    };
+
+    loadExistingRating();
+  }, [professionalId, demandId, state.currentUser?.id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
       // Por favor, selecione uma avaliação
       return;
     }
-    onSubmit(rating, comment);
+
+    try {
+      setLoadingRating(true);
+      const currentUserId = state.currentUser?.id ? parseInt(state.currentUser.id) : null;
+      
+      if (!currentUserId) {
+        throw new Error('Usuário não logado');
+      }
+
+      let response;
+      
+      if (existingRating && existingRating.id) {
+        // Atualizar avaliação existente
+        response = await ratingService.updateRating(existingRating.id, {
+          score: rating,
+          comment: comment
+        });
+      } else {
+        // Criar nova avaliação
+        response = await ratingService.createRating({
+          professional: parseInt(professionalId),
+          score: rating,
+          comment: comment,
+          demand: parseInt(demandId)
+        });
+      }
+
+      if (response.status === 'success') {
+        // Atualizar estado local
+        setExistingRating({
+          id: response.data.id,
+          score: rating,
+          comment: comment,
+          professional: parseInt(professionalId),
+          client: currentUserId
+        });
+        setRatingSubmitted(true);
+        
+        // Chamar callback de sucesso
+        onRatingSuccess?.();
+        
+        // Mostrar popup de sucesso
+        setShowRatingMessage({
+          show: true,
+          message: existingRating ? 'Avaliação atualizada com sucesso!' : 'Avaliação enviada com sucesso!',
+          type: 'success'
+        });
+        
+        // Esconder popup após 3 segundos
+        setTimeout(() => {
+          setShowRatingMessage({ show: false, message: '', type: 'success' });
+        }, 3000);
+      } else {
+        throw new Error(response.message || 'Erro ao salvar avaliação');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar avaliação:', error);
+      // Mostrar popup de erro
+      setShowRatingMessage({
+        show: true,
+        message: 'Erro ao salvar avaliação. Tente novamente.',
+        type: 'error'
+      });
+      
+      // Esconder popup após 3 segundos
+      setTimeout(() => {
+        setShowRatingMessage({ show: false, message: '', type: 'success' });
+      }, 3000);
+    } finally {
+      setLoadingRating(false);
+    }
   };
 
   const renderStars = () => {
     return Array.from({ length: 5 }, (_, index) => {
       const starValue = index + 1;
+      const currentRating = hoveredRating || rating;
+      const isHalfStar = currentRating > index && currentRating < starValue;
+      const isFullStar = starValue <= currentRating;
+      
       return (
         <button
           key={index}
@@ -2846,15 +3231,23 @@ function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingM
           onClick={() => setRating(starValue)}
           onMouseEnter={() => setHoveredRating(starValue)}
           onMouseLeave={() => setHoveredRating(0)}
-          className="focus:outline-none transition-colors"
+          className="focus:outline-none transition-colors relative"
         >
-          <Star
-            className={`h-8 w-8 ${
-              starValue <= (hoveredRating || rating)
-                ? 'text-yellow-500 fill-current'
-                : 'text-gray-300'
-            }`}
-          />
+          <div className="relative">
+            {/* Estrela de fundo (sempre vazia) */}
+            <Star className="h-8 w-8 text-gray-300" />
+            
+            {/* Estrela preenchida ou meia estrela */}
+            {isFullStar && (
+              <Star className="h-8 w-8 text-yellow-500 fill-current absolute top-0 left-0" />
+            )}
+            
+            {isHalfStar && (
+              <div className="absolute top-0 left-0 overflow-hidden w-1/2">
+                <Star className="h-8 w-8 text-yellow-500 fill-current" />
+              </div>
+            )}
+          </div>
         </button>
       );
     });
@@ -2862,7 +3255,28 @@ function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingM
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
+      {/* Popup de mensagem */}
+      {showRatingMessage.show && (
+        <div className="fixed top-4 right-4 z-60 max-w-sm w-auto">
+          <div className={`px-4 py-3 rounded-lg shadow-lg ${
+            showRatingMessage.type === 'success' 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{showRatingMessage.message}</span>
+              <button
+                onClick={() => setShowRatingMessage({ show: false, message: '', type: 'success' })}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="bg-white rounded-lg max-w-lg w-full p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -2880,10 +3294,19 @@ function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingM
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="text-center">
-            <p className="font-medium text-gray-900 mb-2">{professional?.name}</p>
-            <p className="text-sm text-gray-600 mb-4">Projeto: {demandTitle}</p>
+            <p className="font-medium text-gray-900 mb-2">{professionalName || professional?.name || 'Profissional'}</p>
+            <p className="text-sm text-gray-600 mb-4" title={demandTitle}>
+              <span className="truncate inline-block max-w-xs">{demandTitle}</span>
+            </p>
             <div className="flex justify-center space-x-1 mb-4">
-              {renderStars()}
+              {loadingRating ? (
+                <div className="flex items-center space-x-1">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500"></div>
+                  <span className="text-sm text-gray-500">Carregando...</span>
+                </div>
+              ) : (
+                renderStars()
+              )}
             </div>
           </div>
 
@@ -2892,22 +3315,35 @@ function RatingModal({ professionalId, demandTitle, onSubmit, onClose }: RatingM
             onChange={(e) => setComment(e.target.value)}
             placeholder="Conte como foi sua experiência com este profissional..."
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none"
+            disabled={loadingRating}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
 
           <div className="flex space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm whitespace-nowrap"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+              className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm whitespace-nowrap"
+              disabled={loadingRating}
             >
-              Enviar Avaliação
+              {existingRating ? 'Atualizar Avaliação' : 'Enviar Avaliação'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // Finalizar demanda via callback
+                onSubmit();
+              }}
+              className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm whitespace-nowrap disabled:bg-gray-400 disabled:cursor-not-allowed"
+              disabled={loadingRating || (!existingRating && !ratingSubmitted)}
+            >
+              Finalizar
             </button>
           </div>
         </form>

@@ -218,7 +218,7 @@ export class DemandService extends BaseApiService {
     return specialties[specialtyId] || '-';
   }
 
-  private getAvailabilityName(availabilityId: number): string {
+  public getAvailabilityName(availabilityId: number): string {
     // Mapeamento temporário - deve ser substituído por uma busca real
     const availabilities: Record<number, string> = {
       1: 'Imediato',
@@ -354,6 +354,16 @@ export class DemandService extends BaseApiService {
         method: 'DELETE',
       }
     );
+  }
+
+  /**
+   * Busca o profissional selecionado para uma demanda específica
+   */
+  async getChosenProfessional(demandId: number): Promise<any> {
+    const response = await this.makeRequest<any>(
+      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/chosen-professional/`
+    );
+    return response.data;
   }
 }
 

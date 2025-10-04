@@ -3,6 +3,7 @@ import { X, MapPin, Star, Phone, Mail, MessageSquare, User, Award, Layers, Calen
 import { StarRating } from './StarRating';
 import { RatingModal } from './RatingModal';
 import { ratingService } from '../../services/ratingService';
+import { demandService } from '../../services/demandService';
 import { ProfessionalSearchResult } from '../../types';
 
 interface ProfessionalProfileModalProps {
@@ -43,8 +44,27 @@ export function ProfessionalProfileModal({
   refreshTrigger,
   currentUserId
 }: ProfessionalProfileModalProps) {
+  // Função para obter o nome da disponibilidade
+  const getAvailabilityName = (availabilityId: number): string => {
+    const availabilities: Record<number, string> = {
+      1: 'Imediato',
+      2: '1 semana',
+      3: '2 semanas',
+      4: '1 mês',
+      5: '2 meses',
+      6: '3 meses',
+    };
+    
+    return availabilities[availabilityId] || '-';
+  };
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loadingRatings, setLoadingRatings] = useState(false);
+  const [existingRating, setExistingRating] = useState<{
+    id: number;
+    score: number;
+    comment?: string;
+  } | null>(null);
+  const [showNoPhoneModal, setShowNoPhoneModal] = useState(false);
 
   // Carregar avaliações quando o modal abrir
   useEffect(() => {
@@ -81,20 +101,29 @@ export function ProfessionalProfileModal({
       const message = `Olá ${professional.full_name}! Vi seu perfil na VINKO e gostaria de conversar sobre um projeto.`;
       const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
+    } else {
+      setShowNoPhoneModal(true);
     }
   };
 
   const handleRateClick = () => {
+    setExistingRating(null); // Nova avaliação
     if (onRateProfessional) {
       onRateProfessional(professional);
     }
   };
 
   const handleEditRating = (rating: Rating) => {
+    setExistingRating({
+      id: rating.id,
+      score: rating.score,
+      comment: rating.comment
+    });
     if (onRateProfessional) {
       onRateProfessional(professional);
     }
   };
+
 
   if (!isOpen) return null;
 
@@ -239,7 +268,9 @@ export function ProfessionalProfileModal({
               </h3>
               {professional.availability ? (
                 <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                  {professional.availability}
+                  {typeof professional.availability === 'number' 
+                    ? getAvailabilityName(professional.availability)
+                    : professional.availability}
                 </span>
               ) : (
                 <p className="text-gray-500 text-sm">Disponibilidade não informada.</p>
@@ -402,6 +433,58 @@ export function ProfessionalProfileModal({
         </div>
       </div>
 
+      {/* Rating Modal */}
+      {showRatingModal && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            if (onCloseRatingModal) {
+              onCloseRatingModal();
+            }
+          }}
+          professionalId={professional.id}
+          professionalName={professional.full_name}
+          existingRating={existingRating}
+          onRatingSubmit={async (rating, comment) => {
+            if (onRatingSubmit) {
+              await onRatingSubmit(rating, comment);
+            }
+          }}
+          onRatingDelete={async () => {
+            if (onRatingDelete) {
+              await onRatingDelete();
+            }
+          }}
+        />
+      )}
+
+      {/* Modal de Telefone Não Cadastrado */}
+      {showNoPhoneModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Phone className="h-8 w-8 text-yellow-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Telefone não cadastrado
+              </h3>
+              <p className="text-gray-600 mb-6">
+                O profissional <span className="font-medium">{professional.full_name}</span> não possui telefone cadastrado para WhatsApp.
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Você pode tentar entrar em contato através do botão "Conversar" ou aguardar até que o profissional atualize suas informações de contato.
+              </p>
+              <button
+                onClick={() => setShowNoPhoneModal(false)}
+                className="w-full bg-pink-500 text-white py-3 px-4 rounded-lg hover:bg-pink-600 transition-colors font-medium"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

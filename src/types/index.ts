@@ -452,6 +452,89 @@ export interface Message {
   type: 'text' | 'image' | 'file';
 }
 
+// Tipos para conversas da API
+export interface ConversationParticipant {
+  id: number;
+  services: number[];
+  areas: number[];
+  work_count: number;
+  password: string;
+  last_login: string | null;
+  is_superuser: boolean;
+  username: string;
+  first_name: string;
+  last_name: string;
+  is_staff: boolean;
+  is_active: boolean;
+  date_joined: string;
+  created_at: string;
+  updated_at: string;
+  user_type: 'CLIENTE' | 'PROFISSIONAL';
+  email: string;
+  full_name: string | null;
+  is_email_verified: boolean;
+  is_user_test: boolean;
+  birth_date: string | null;
+  cellphone: string | null;
+  postal_code: string | null;
+  city: string | null;
+  uf: string | null;
+  neighborhood: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  company_size: string | null;
+  cnpj: string | null;
+  cpf: string | null;
+  corporate_name: string | null;
+  trade_name: string | null;
+  company_cep: string | null;
+  company_city: string | null;
+  company_uf: string | null;
+  company_neighborhood: string | null;
+  company_street: string | null;
+  company_number: string | null;
+  company_complement: string | null;
+  company_cellphone: string | null;
+  company_email: string | null;
+  tecid_type: string | null;
+  year_experience: number | null;
+  daily_production_capacity: number | null;
+  min_required_production: number | null;
+  max_required_production: number | null;
+  rating_avg: number;
+  rating_count: number;
+  about_me: string | null;
+  availability: number | null;
+  groups: any[];
+  user_permissions: any[];
+  specialties: number[];
+  machines: number[];
+}
+
+export interface ConversationMessage {
+  id: number;
+  conversation: number;
+  sender: ConversationParticipant;
+  content: string;
+  is_read: boolean;
+  is_edited: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiConversation {
+  id: number;
+  participants: ConversationParticipant[];
+  title: string;
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
+  last_message: ConversationMessage | null;
+  unread_count: number;
+  is_archived: boolean;
+}
+
 // Tipos para a API de busca de profissionais
 export interface ProfessionalSearchResult {
   id: number;

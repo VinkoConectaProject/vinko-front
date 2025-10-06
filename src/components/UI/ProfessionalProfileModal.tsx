@@ -106,23 +106,7 @@ export function ProfessionalProfileModal({
     }
   };
 
-  const handleRateClick = () => {
-    setExistingRating(null); // Nova avaliação
-    if (onRateProfessional) {
-      onRateProfessional(professional);
-    }
-  };
 
-  const handleEditRating = (rating: Rating) => {
-    setExistingRating({
-      id: rating.id,
-      score: rating.score,
-      comment: rating.comment
-    });
-    if (onRateProfessional) {
-      onRateProfessional(professional);
-    }
-  };
 
 
   if (!isOpen) return null;
@@ -290,13 +274,10 @@ export function ProfessionalProfileModal({
                   <p className="text-sm text-gray-500 mt-2">Carregando avaliações...</p>
                 </div>
               ) : ratings.length === 0 ? (
-                <div 
-                  className="bg-gray-50 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={handleRateClick}
-                >
+                <div className="bg-gray-50 rounded-lg p-6 text-center">
                   <Star className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-500">Nenhuma avaliação ainda</p>
-                  <p className="text-gray-400 text-sm">Clique para avaliar este profissional!</p>
+                  <p className="text-gray-400 text-sm">Ainda não há avaliações para este profissional</p>
                 </div>
               ) : (
                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
@@ -306,13 +287,7 @@ export function ProfessionalProfileModal({
                     return (
                       <div 
                         key={rating.id} 
-                        className={`border border-gray-200 rounded-lg p-4 ${
-                          isCurrentUserRating 
-                            ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-300 transition-colors' 
-                            : ''
-                        }`}
-                        onClick={isCurrentUserRating ? () => handleEditRating(rating) : undefined}
-                        title={isCurrentUserRating ? 'Clique para editar sua avaliação' : undefined}
+                        className="border border-gray-200 rounded-lg p-4"
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center space-x-2">
@@ -351,11 +326,6 @@ export function ProfessionalProfileModal({
                         ) : (
                           <p className="text-gray-500 text-sm mt-2 pl-8 italic">
                             Sem comentário
-                          </p>
-                        )}
-                        {isCurrentUserRating && (
-                          <p className="text-xs text-pink-600 mt-2 pl-8 italic">
-                            Clique para editar
                           </p>
                         )}
                       </div>

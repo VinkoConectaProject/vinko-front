@@ -20,9 +20,12 @@ import { ApiConversation, ConversationParticipant, ConversationMessage } from '.
 
 interface MessagesPageProps {
   selectedConversationId?: string;
+  onStartConversation?: (otherUserId: string, demandId?: string, initialMessage?: string) => void;
 }
 
-export function MessagesPage({ selectedConversationId }: MessagesPageProps) {
+export function MessagesPage({ selectedConversationId, onStartConversation }: MessagesPageProps) {
+  // onStartConversation pode ser usado no futuro para iniciar conversas programaticamente
+  void onStartConversation;
   const { state, dispatch } = useApp();
   const [selectedConversation, setSelectedConversation] = useState<ApiConversation | null>(null);
   const [conversations, setConversations] = useState<ApiConversation[]>([]);

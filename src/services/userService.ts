@@ -17,6 +17,49 @@ interface ServiceOptionsResponse {
   data: ServiceOption[];
 }
 
+interface ProfessionalRating {
+  id: number;
+  score: number;
+  comment: string;
+  client_name: string;
+  demand_title: string;
+  created_at: string;
+}
+
+interface ProfessionalAnalytics {
+  active_jobs: number;
+  rating_avg: number;
+  rating_count: number;
+  completed_jobs: number;
+  open_demands: number;
+  ratings: ProfessionalRating[];
+}
+
+interface ClientAnalytics {
+  active_demands: number;
+  interested_professionals: number;
+  completed_jobs: number;
+  available_professionals: number;
+}
+
+interface ClientSearchResult {
+  id: number;
+  nome: string;
+  razao_social: string;
+  especialidade: string;
+  estado: string;
+  cidade: string;
+  total_demandas: number;
+  trabalhos_concluidos: number;
+}
+
+interface ClientSearchResponse {
+  status: string;
+  message: string;
+  error: string;
+  data: ClientSearchResult[];
+}
+
 export class UserService extends BaseApiService {
   // Obter perfil do usuário atual
   async getCurrentUser(): Promise<DjangoUser> {
@@ -198,6 +241,44 @@ export class UserService extends BaseApiService {
     return {
       message: response.message
     };
+  }
+
+  // Obter analytics do dashboard profissional
+  async getProfessionalAnalytics(): Promise<ProfessionalAnalytics> {
+    const response = await this.makeRequest<ProfessionalAnalytics>('/user/users/dashboard_professional_analytics/');
+    return response.data;
+  }
+
+  // Obter analytics do dashboard do cliente
+  async getClientAnalytics(): Promise<ClientAnalytics> {
+    const response = await this.makeRequest<ClientAnalytics>('/user/users/dashboard_client_analytics/');
+    return response.data;
+  }
+
+  // Buscar clientes/marca
+  async searchClients(params: {
+    specialty_id?: string;
+    uf?: string;
+    city?: string;
+    search?: string;
+  } = {}): Promise<ClientSearchResult[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (params.specialty_id) queryParams.append('specialty_id', params.specialty_id);
+      if (params.uf) queryParams.append('uf', params.uf);
+      if (params.city) queryParams.append('city', params.city);
+      if (params.search) queryParams.append('search', params.search);
+
+      const queryString = queryParams.toString();
+      const url = `/user/clients/search/${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await this.makeRequest<ClientSearchResponse>(url);
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar clientes:', error);
+      return [];
+    }
   }
 }
 

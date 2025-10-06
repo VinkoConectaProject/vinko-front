@@ -10,6 +10,8 @@ import { ApiMessage } from '../UI/ApiMessage';
 
 interface OpportunitiesPageProps {
   onStartConversation?: (otherUserId: string, demandId?: string, initialMessage?: string) => void;
+  selectedDemandId?: string | null;
+  onCloseModal?: () => void;
 }
 
 interface ServiceOption {
@@ -36,7 +38,7 @@ interface SearchFilters {
   cities: string[];
 }
 
-export default function OpportunitiesPage({ onStartConversation }: OpportunitiesPageProps) {
+export default function OpportunitiesPage({ onStartConversation, selectedDemandId, onCloseModal }: OpportunitiesPageProps) {
   const { state, dispatch } = useApp();
   const { apiMessage, showMessage, hideMessage } = useApiMessage();
   
@@ -72,6 +74,16 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Abrir modal automaticamente se selectedDemandId for fornecido
+  useEffect(() => {
+    if (selectedDemandId && opportunities.length > 0) {
+      const demand = opportunities.find(d => d.id === selectedDemandId);
+      if (demand) {
+        setSelectedDemand(demand);
+      }
+    }
+  }, [selectedDemandId, opportunities]);
 
   // Fechar dropdowns quando clicar fora
   useEffect(() => {
@@ -676,7 +688,10 @@ export default function OpportunitiesPage({ onStartConversation }: Opportunities
       {selectedDemand && (
         <DemandDetailsModal
           demand={selectedDemand}
-          onClose={() => setSelectedDemand(null)}
+          onClose={() => {
+            setSelectedDemand(null);
+            onCloseModal?.();
+          }}
           onContactWhatsApp={handleContactWhatsApp}
           onStartConversation={handleStartConversationDemand}
           onShowInterest={handleShowInterest}

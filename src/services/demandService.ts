@@ -24,12 +24,15 @@ export class DemandService extends BaseApiService {
   /**
    * Busca todas as demandas do usuário logado com contadores
    */
-  async getDemands(search?: string): Promise<DemandsWithCounters> {
+  async getDemands(search?: string, userCreated?: number): Promise<DemandsWithCounters> {
     let url = API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS;
     const params = new URLSearchParams();
     
     if (search) {
       params.append('search', search);
+    }
+    if (userCreated) {
+      params.append('user_created', userCreated.toString());
     }
     params.append('ordering', '-created_at');
     
@@ -406,8 +409,9 @@ export class DemandService extends BaseApiService {
       }
     );
 
-    if (response.status === 404) {
-      throw new Error('Profissional não encontrado');
+    // Se não há profissional selecionado, retornar null em vez de erro
+    if (response.status === 404 || response.status === 400) {
+      return null;
     }
 
     if (!response.ok) {
@@ -422,10 +426,18 @@ export class DemandService extends BaseApiService {
    * Busca profissionais interessados em uma demanda específica
    */
   async getInterestedProfessionals(demandId: number): Promise<any[]> {
-    const response = await this.makeRequest<any[]>(
-      `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/interested-professionals/`
-    );
-    return response.data;
+    try {
+      const response = await this.makeRequest<any[]>(
+        `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}${demandId}/interested-professionals/`
+      );
+      return response.data || [];
+    } catch (error: any) {
+      // Se não há profissionais interessados, retornar array vazio
+      if (error.message?.includes('404') || error.message?.includes('400')) {
+        return [];
+      }
+      throw error;
+    }
   }
 }
 

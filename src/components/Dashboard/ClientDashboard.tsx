@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react';
-import { Briefcase, Users, Calendar, TrendingUp, Plus, Eye, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Briefcase, Users, Calendar, TrendingUp, Plus, Eye, MessageSquare, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { userService } from '../../services/userService';
+import { demandService } from '../../services/demandService';
+import { Demand } from '../../types';
 
 interface ClientDashboardProps {
   onPageChange: (page: string) => void;
@@ -13,6 +16,16 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
   const { state } = useApp();
   const [currentPage, setCurrentPage] = React.useState(1);
   const demandsPerPage = 10;
+  const [analytics, setAnalytics] = useState({
+    active_demands: 0,
+    interested_professionals: 0,
+    completed_jobs: 0,
+    available_professionals: 0
+  });
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
+  const [recentDemands, setRecentDemands] = useState<Demand[]>([]);
+  const [isLoadingDemands, setIsLoadingDemands] = useState(true);
+  const [totalDemands, setTotalDemands] = useState(0);
 
   const userProfile = state.clientProfiles.find(p => p.userId === state.currentUser?.id);
   const userDemands = state.demands.filter(d => d.clientId === state.currentUser?.id);
@@ -35,28 +48,28 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
   const stats = [
     {
       label: 'Demandas Ativas',
-      value: userDemands.filter(d => d.status === 'open' || d.status === 'in_progress').length,
+      value: isLoadingAnalytics ? '...' : analytics.active_demands.toString(),
       icon: Briefcase,
       color: 'text-pink-600',
       bg: 'bg-pink-100',
     },
     {
       label: 'Profissionais Interessados',
-      value: uniqueInterestedProfessionals,
+      value: isLoadingAnalytics ? '...' : analytics.interested_professionals.toString(),
       icon: Users,
       color: 'text-green-600',
       bg: 'bg-green-100',
     },
     {
       label: 'Trabalhos Concluídos',
-      value: userDemands.filter(d => d.status === 'completed').length,
+      value: isLoadingAnalytics ? '...' : analytics.completed_jobs.toString(),
       icon: TrendingUp,
       color: 'text-pink-600',
       bg: 'bg-pink-100',
     },
     {
       label: 'Profissionais Disponíveis',
-      value: totalProfessionals,
+      value: isLoadingAnalytics ? '...' : analytics.available_professionals.toString(),
       icon: Eye,
       color: 'text-orange-600',
       bg: 'bg-orange-100',
@@ -72,6 +85,56 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  // Carregar analytics do dashboard
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      try {
+        setIsLoadingAnalytics(true);
+        console.log('Carregando analytics do dashboard do cliente...');
+        
+        const analyticsData = await userService.getClientAnalytics();
+        console.log('Analytics do cliente carregadas:', analyticsData);
+        setAnalytics(analyticsData);
+        
+      } catch (error) {
+        console.error('Erro ao carregar analytics do cliente:', error);
+        // Usar dados locais como fallback
+        setAnalytics({
+          active_demands: userDemands.filter(d => d.status === 'open' || d.status === 'in_progress').length,
+          interested_professionals: uniqueInterestedProfessionals,
+          completed_jobs: userDemands.filter(d => d.status === 'completed').length,
+          available_professionals: totalProfessionals
+        });
+      } finally {
+        setIsLoadingAnalytics(false);
+      }
+    };
+
+    loadAnalytics();
+  }, []);
+
+  // Carregar demandas recentes da API
+  useEffect(() => {
+    const loadRecentDemands = async () => {
+      try {
+        setIsLoadingDemands(true);
+        const userId = state.currentUser?.id ? parseInt(state.currentUser.id) : undefined;
+        const { demands, counters } = await demandService.getDemands(undefined, userId);
+        // Pegar apenas as 3 primeiras demandas
+        setRecentDemands(demands.slice(0, 3));
+        setTotalDemands(counters.total);
+      } catch (error) {
+        console.error('Erro ao carregar demandas recentes:', error);
+        setRecentDemands([]);
+        setTotalDemands(0);
+      } finally {
+        setIsLoadingDemands(false);
+      }
+    };
+
+    loadRecentDemands();
+  }, [state.currentUser?.id]);
 
   return (
     <div className="py-8">
@@ -139,14 +202,30 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Suas Demandas</h2>
-          {userDemands.length > 0 && (
-            <span className="text-sm text-gray-500">
-              {userDemands.length} demanda{userDemands.length !== 1 ? 's' : ''} total
-            </span>
-          )}
+          <div className="flex items-center space-x-4">
+            {totalDemands > 0 && (
+              <span className="text-sm text-gray-500">
+                {totalDemands} demanda{totalDemands !== 1 ? 's' : ''} total
+              </span>
+            )}
+            {totalDemands > 3 && (
+              <button 
+                onClick={() => onPageChange('my-demands')}
+                className="flex items-center text-pink-600 hover:text-pink-700 transition-colors text-sm font-medium"
+              >
+                Ver todas
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </button>
+            )}
+          </div>
         </div>
         
-        {userDemands.length === 0 ? (
+        {isLoadingDemands ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+            <span className="ml-2 text-gray-600">Carregando demandas...</span>
+          </div>
+        ) : recentDemands.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500 mb-4">Você ainda não publicou nenhuma demanda</p>
             <button 
@@ -158,88 +237,20 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
             </button>
           </div>
         ) : (
-        
           <>
             <div className="space-y-4">
-              {paginatedDemands.map((demand) => (
-                <div key={demand.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{demand.title}</h3>
-                      <p className="text-gray-600 mt-1">{demand.description}</p>
-                      <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          demand.status === 'open' ? 'bg-green-100 text-green-800' :
-                          demand.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {demand.status === 'open' ? 'Aberta' : 
-                           demand.status === 'in_progress' ? 'Em andamento' : 
-                           'Concluída'}
-                        </span>
-                        <span className="flex items-center">
-                          <Users className="h-4 w-4 mr-1" />
-                          {demand.interestedProfessionals.length} interessados
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {new Date(demand.deadline).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => onShowDemandDetails(demand.id)}
-                      className="bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600 transition-colors"
-                    >
-                      Gerenciar
-                    </button>
-                  </div>
-                </div>
+              {recentDemands.map((demand) => (
+                <DemandCard
+                  key={demand.id}
+                  demand={demand}
+                  onManage={() => {
+                    console.log('Clicou em Gerenciar para demanda:', demand.id);
+                    onPageChange('my-demands');
+                    onShowDemandDetails(demand.id);
+                  }}
+                />
               ))}
             </div>
-            
-            {/* Paginação */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-500">
-                  Mostrando {startIndex + 1} a {Math.min(endIndex, userDemands.length)} de {userDemands.length} demandas
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  
-                  <div className="flex space-x-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                          currentPage === page
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                  
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -262,6 +273,95 @@ export function ClientDashboard({ onPageChange, onShowDemandForm, onShowDemandDe
     </button>
   </a>
 </div>
+    </div>
+  );
+}
+
+// Componente de Card de Demanda para o Dashboard
+interface DemandCardProps {
+  demand: Demand;
+  onManage: () => void;
+}
+
+function DemandCard({ demand, onManage }: DemandCardProps) {
+  // Função para truncar texto
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  // Função para obter a cor do status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Função para obter o texto do status
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'open':
+        return 'Aberta';
+      case 'in_progress':
+        return 'Em andamento';
+      case 'completed':
+        return 'Concluída';
+      default:
+        return 'Desconhecido';
+    }
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+      <div className="flex justify-between items-start">
+        <div className="flex-1 min-w-0 pr-4">
+          {/* Título */}
+          <h3 
+            className="font-semibold text-gray-900 mb-1" 
+            title={demand.title}
+          >
+            {demand.title}
+          </h3>
+          
+          {/* Descrição */}
+          <p 
+            className="text-gray-600 text-sm mb-3" 
+            title={demand.description}
+          >
+            {truncateText(demand.description, 150)}
+          </p>
+          
+          {/* Informações do status, interessados e data */}
+          <div className="flex items-center space-x-4 text-sm text-gray-500">
+            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(demand.status)}`}>
+              {getStatusText(demand.status)}
+            </span>
+            <span className="flex items-center">
+              <Users className="h-4 w-4 mr-1 flex-shrink-0" />
+              {demand.interestedProfessionals?.length || 0} interessados
+            </span>
+            <span className="flex items-center">
+              <Calendar className="h-4 w-4 mr-1 flex-shrink-0" />
+              {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
+            </span>
+          </div>
+        </div>
+        
+        {/* Botão Gerenciar */}
+        <button
+          onClick={onManage}
+          className="bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600 transition-colors text-sm font-medium flex-shrink-0"
+        >
+          Gerenciar
+        </button>
+      </div>
     </div>
   );
 }

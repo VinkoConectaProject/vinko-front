@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingPage } from './pages/landing/LandingPage';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { LoginForm } from './components/Auth/LoginForm';
@@ -33,6 +33,8 @@ function AppContent() {
   const [showDemandForm, setShowDemandForm] = useState(false);
   const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
+  const [selectedClientDemandId, setSelectedClientDemandId] = useState<string | null>(null);
   const [appState, setAppState] = useState<'loading' | 'landing' | 'auth' | 'emailVerification' | 'resetPassword' | 'dashboard'>('loading');
   const [verificationEmail, setVerificationEmail] = useState<string>('');
   const [resetPasswordCode, setResetPasswordCode] = useState<string>('');
@@ -68,7 +70,7 @@ function AppContent() {
       // Código válido, mostrar página de redefinir senha
       setResetPasswordCode(code);
       setAppState('resetPassword');
-    } catch (error: unknown) {
+    } catch {
       // Código inválido, redirecionar para página de esqueci a senha
       setAppState('auth');
       setAuthMode('forgot');
@@ -280,7 +282,8 @@ function AppContent() {
           return (
             <ProfessionalDashboard 
               onPageChange={setCurrentPage}
-              onShowOpportunityDetails={() => {
+              onShowOpportunityDetails={(demand) => {
+                setSelectedOpportunityId(demand.id);
                 setCurrentPage('opportunities');
               }}
             />
@@ -288,7 +291,13 @@ function AppContent() {
         case 'profile':
           return <ProfessionalProfileForm />;
         case 'opportunities':
-          return <OpportunitiesPage onStartConversation={startConversation} />;
+          return (
+            <OpportunitiesPage 
+              onStartConversation={startConversation}
+              selectedDemandId={selectedOpportunityId}
+              onCloseModal={() => setSelectedOpportunityId(null)}
+            />
+          );
         case 'my-jobs':
           return <MyJobsPage />;
         case 'notifications':
@@ -319,8 +328,9 @@ function AppContent() {
                 setShowDemandForm(true);
               }}
               onShowDemandDetails={(demandId) => {
+                console.log('App.tsx - Definindo selectedClientDemandId:', demandId);
+                setSelectedClientDemandId(demandId);
                 setCurrentPage('my-demands');
-                setSelectedDemandId(demandId);
               }}
               onStartConversation={startConversation}
             />
@@ -333,10 +343,11 @@ function AppContent() {
           return (
             <MyDemandsPage 
               showCreateForm={showDemandForm}
-              selectedDemandId={selectedDemandId}
+              selectedDemandId={selectedClientDemandId || selectedDemandId}
               onCloseForm={() => {
                 setShowDemandForm(false);
                 setSelectedDemandId(null);
+                setSelectedClientDemandId(null);
               }}
               onStartConversation={startConversation}
             />

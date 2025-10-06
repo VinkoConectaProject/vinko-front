@@ -212,7 +212,8 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
   const loadDemands = useCallback(async (searchTerm?: string) => {
     try {
       setIsLoadingDemands(true);
-      const { demands, counters } = await demandService.getDemands(searchTerm);
+      const userId = state.currentUser?.id ? parseInt(state.currentUser.id) : undefined;
+      const { demands, counters } = await demandService.getDemands(searchTerm, userId);
       setApiDemands(demands);
       setDemandCounters(counters);
       
@@ -224,7 +225,7 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
     } finally {
       setIsLoadingDemands(false);
     }
-  }, [showMessage, loadSelectedProfessionalsData]);
+  }, [showMessage, loadSelectedProfessionalsData, state.currentUser?.id]);
 
   // Carregar demandas quando o componente montar
   useEffect(() => {
@@ -814,10 +815,18 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
 
   React.useEffect(() => {
     if (selectedDemandId) {
-      const demand = state.demands.find(d => d.id === selectedDemandId);
+      console.log('Tentando abrir modal para demanda:', selectedDemandId);
+      console.log('API Demands:', apiDemands.length);
+      console.log('State Demands:', state.demands.length);
+      
+      // Procurar primeiro nos dados da API, depois nos dados locais
+      const demand = apiDemands.find(d => d.id === selectedDemandId) || 
+                    state.demands.find(d => d.id === selectedDemandId);
+      
+      console.log('Demanda encontrada:', demand);
       setSelectedDemand(demand || null);
     }
-  }, [selectedDemandId, state.demands]);
+  }, [selectedDemandId, apiDemands, state.demands]);
 
   React.useEffect(() => {
     setShowDemandForm(showCreateForm || false);
@@ -1164,32 +1173,23 @@ export function MyDemandsPage({ showCreateForm, selectedDemandId, onCloseForm, o
 
                 {/* Actions */}
                 <div className="flex flex-col space-y-2">
-                  {demand.status === 'open' && (
+                  {(demand.status === 'open' || demand.status === 'in_progress') && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedDemandForCandidates(demand);
                         setShowCandidatesModal(true);
                       }}
-                      className="w-full bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium flex items-center justify-center"
+                      disabled={demand.interestedProfessionals.length === 0}
+                      className={`w-full px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors ${
+                        demand.interestedProfessionals.length === 0
+                          ? 'bg-pink-600 text-white opacity-50 cursor-not-allowed'
+                          : 'bg-pink-600 text-white hover:bg-pink-700'
+                      }`}
                     >
                       <Eye className="h-4 w-4 mr-2" />
                       Gerenciar ({demand.interestedProfessionals.length} candidatos)
                     </button>
-                  )}
-
-                  {demand.status === 'in_progress' && !demand.selectedProfessional && (
-                      <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDemandForCandidates(demand);
-                        setShowCandidatesModal(true);
-                      }}
-                      className="w-full bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium flex items-center justify-center"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Gerenciar ({demand.interestedProfessionals.length} candidatos)
-                      </button>
                   )}
 
 
@@ -1836,7 +1836,9 @@ function CandidatesModal({ demand, onClose, onProfessionalSelectionChange }: Can
             </div>
           ) : interestedProfessionals.length === 0 ? (
             <div className="text-center py-12">
-              <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <User className="h-8 w-8 text-gray-400" />
+              </div>
               <p className="text-gray-500 text-lg">Nenhum candidato interessado ainda</p>
               <p className="text-gray-400 text-sm mt-2">
                 Os profissionais interessados aparecerão aqui quando demonstrarem interesse na sua demanda.
@@ -2947,7 +2949,12 @@ function DemandDetailsModal({
             <div className="flex gap-3">
               <button
                 onClick={() => onManageCandidates(updatedDemand)}
-                className="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors"
+                disabled={updatedDemand.interestedProfessionals.length === 0 || demand.status === 'completed'}
+                className={`px-6 py-2 rounded-lg transition-colors ${
+                  updatedDemand.interestedProfessionals.length === 0 || demand.status === 'completed'
+                    ? 'bg-pink-600 text-white opacity-50 cursor-not-allowed'
+                    : 'bg-pink-600 text-white hover:bg-pink-700'
+                }`}
               >
                 Gerenciar candidatos ({updatedDemand.interestedProfessionals.length})
               </button>
@@ -3096,8 +3103,18 @@ function RatingModal({ professionalId, demandId, demandTitle, professionalName, 
     message: string;
     type: 'success' | 'error';
   }>({ show: false, message: '', type: 'success' });
+  
+  // Estados para rastrear valores originais
+  const [originalRating, setOriginalRating] = useState(0);
+  const [originalComment, setOriginalComment] = useState('');
 
   const professional = state.professionalProfiles.find(p => p.userId === professionalId);
+
+  // Função para verificar se houve alterações
+  const hasChanges = () => {
+    if (!existingRating) return false; // Se não há avaliação existente, não há mudanças
+    return rating !== originalRating || comment !== originalComment;
+  };
 
   // Carregar avaliação existente quando o modal abrir
   useEffect(() => {
@@ -3118,11 +3135,17 @@ function RatingModal({ professionalId, demandId, demandTitle, professionalName, 
             setExistingRating(response.data);
             setRating(response.data.score || 0);
             setComment(response.data.comment || '');
+            // Salvar valores originais
+            setOriginalRating(response.data.score || 0);
+            setOriginalComment(response.data.comment || '');
           } else {
             // Se não há avaliação existente
             setExistingRating(null);
             setRating(0);
             setComment('');
+            // Salvar valores originais
+            setOriginalRating(0);
+            setOriginalComment('');
           }
         }
       } catch (error) {
@@ -3329,8 +3352,12 @@ function RatingModal({ professionalId, demandId, demandTitle, professionalName, 
             </button>
             <button
               type="submit"
-              className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm whitespace-nowrap"
-              disabled={loadingRating}
+              className={`flex-1 px-3 py-2 rounded-lg transition-colors font-medium text-sm whitespace-nowrap ${
+                existingRating && !hasChanges()
+                  ? 'bg-yellow-500 text-white opacity-50 cursor-not-allowed'
+                  : 'bg-yellow-500 text-white hover:bg-yellow-600'
+              }`}
+              disabled={loadingRating || (!!existingRating && !hasChanges())}
             >
               {existingRating ? 'Atualizar Avaliação' : 'Enviar Avaliação'}
             </button>

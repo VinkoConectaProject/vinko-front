@@ -50,8 +50,16 @@ export function SearchProfessionalsPage() {
   const [showNoPhoneModal, setShowNoPhoneModal] = useState(false);
   const [selectedProfessionalName, setSelectedProfessionalName] = useState('');
   
+  // Controle de visibilidade do botão Avaliar - desabilitado por segurança
+  const SHOW_RATING_BUTTON = false;
+  
   // Função para abrir modal de avaliação
   const handleOpenRatingModal = async (professional: ProfessionalSearchResult) => {
+    // Verificação de segurança - função desabilitada
+    if (!SHOW_RATING_BUTTON) {
+      return;
+    }
+    
     setSelectedProfessional(professional);
     
     // Verificar se já existe avaliação para este profissional
@@ -1047,15 +1055,17 @@ export function SearchProfessionalsPage() {
                       size="sm"
                     />
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenRatingModal(professional);
-                    }}
-                    className="text-pink-600 hover:text-pink-700 text-sm font-medium transition-colors"
-                  >
-                    Avaliar
-                  </button>
+                  {SHOW_RATING_BUTTON && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenRatingModal(professional);
+                      }}
+                      className="text-pink-600 hover:text-pink-700 text-sm font-medium transition-colors"
+                    >
+                      Avaliar
+                    </button>
+                  )}
                 </div>
                 
                 {/* Serviços */}

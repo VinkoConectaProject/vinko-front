@@ -1,7 +1,6 @@
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, TOKEN_CONFIG } from '../config/api';
 import { ApiResponse, ApiError } from '../types';
 import { ERROR_MESSAGES } from '../config/errorMessages';
-import { authService } from './authService';
 
 export class BaseApiService {
   protected baseURL = API_CONFIG.BASE_URL;
@@ -10,6 +9,42 @@ export class BaseApiService {
     resolve: (value: any) => void;
     reject: (error: any) => void;
   }> = [];
+
+  // Métodos para gerenciar tokens (evita dependência circular)
+  protected getAccessToken(): string | null {
+    return localStorage.getItem(TOKEN_CONFIG.ACCESS_TOKEN_KEY);
+  }
+
+  protected getRefreshToken(): string | null {
+    return localStorage.getItem(TOKEN_CONFIG.REFRESH_TOKEN_KEY);
+  }
+
+  protected saveTokens(accessToken: string, refreshToken: string): void {
+    localStorage.setItem(TOKEN_CONFIG.ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(TOKEN_CONFIG.REFRESH_TOKEN_KEY, refreshToken);
+  }
+
+  protected clearTokens(): void {
+    localStorage.removeItem(TOKEN_CONFIG.ACCESS_TOKEN_KEY);
+    localStorage.removeItem(TOKEN_CONFIG.REFRESH_TOKEN_KEY);
+    localStorage.removeItem('user_data');
+  }
+
+  protected async refreshToken(refreshToken: string): Promise<{ access: string; refresh: string }> {
+    const response = await fetch(`${this.baseURL}${API_CONFIG.ENDPOINTS.AUTH.REFRESH}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao renovar token');
+    }
+
+    return response.json();
+  }
 
   // Processar fila de requisições falhadas
   private processQueue(error: any, token: string | null = null) {
@@ -73,7 +108,7 @@ export class BaseApiService {
           return this.handleApiResponse<T>(retryData);
         } else {
           // Falha na renovação, fazer logout
-          authService.logout();
+          this.clearTokens();
           throw new Error('Sessão expirada. Faça login novamente.');
         }
       }
@@ -147,20 +182,17 @@ export class BaseApiService {
     this.isRefreshing = true;
 
     try {
-      const refreshToken = authService.getRefreshToken();
+      const refreshToken = this.getRefreshToken();
       if (!refreshToken) {
         this.processQueue(new Error('Refresh token não encontrado'), null);
         return null;
       }
 
-      // Fazer refresh diretamente sem chamar checkAndRefreshTokens
-      const newTokens = await authService.refreshToken(refreshToken);
+      // Fazer refresh diretamente
+      const newTokens = await this.refreshToken(refreshToken);
       
-      // Buscar dados atualizados do usuário
-      const currentUser = await authService.getCurrentUser();
-      
-      // Salvar novos dados
-      authService.saveAuthData(newTokens.access, newTokens.refresh, currentUser);
+      // Salvar novos tokens
+      this.saveTokens(newTokens.access, newTokens.refresh);
       
       this.processQueue(null, newTokens.access);
       return newTokens.access;
@@ -174,7 +206,7 @@ export class BaseApiService {
 
   // Função para adicionar token de autorização
   protected getAuthHeaders(): Record<string, string> {
-    const token = authService.getAccessToken();
+    const token = this.getAccessToken();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 

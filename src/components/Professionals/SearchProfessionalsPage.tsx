@@ -317,7 +317,7 @@ export function SearchProfessionalsPage() {
         params.append('search', currentSearchTerm.trim());
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/user/professionals/search/?${params.toString()}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_HOST || 'http://localhost:8000/api/v1'}/user/professionals/search/?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

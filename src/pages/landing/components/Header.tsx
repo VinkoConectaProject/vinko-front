@@ -35,9 +35,6 @@ export function Header({ onNavigateToAuth }: HeaderProps) {
             <a href="#oportunidades" className="text-gray-600 hover:text-pink-500 transition-colors font-medium">
               Oportunidades
             </a>
-            <a href="#precos" className="text-gray-600 hover:text-pink-500 transition-colors font-medium">
-              Preço
-            </a>
           </nav>
 
           {/* Desktop CTA Buttons */}
@@ -86,13 +83,6 @@ export function Header({ onNavigateToAuth }: HeaderProps) {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Oportunidades
-              </a>
-              <a 
-                href="#precos" 
-                className="text-gray-600 hover:text-pink-500 transition-colors font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Preço
               </a>
               <div className="flex flex-col space-y-3 pt-4 border-t border-gray-100">
                 <button

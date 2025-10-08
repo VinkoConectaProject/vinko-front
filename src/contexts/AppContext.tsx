@@ -245,6 +245,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
           users = JSON.parse(usersData, dateReviver);
         }
         
+        // Carregar outros dados primeiro
+        let parsedData = {};
+        try {
+          const savedData = localStorage.getItem('vinko-data');
+          if (savedData && savedData !== 'undefined' && isMounted) {
+            parsedData = JSON.parse(savedData, dateReviver);
+          }
+        } catch (err) {
+          // Erro ao fazer parse do vinko-data - limpar dados corrompidos
+          console.error('Erro ao carregar vinko-data. Limpando...', err);
+          localStorage.removeItem('vinko-data');
+        }
+        
         // Carregar usuário atual
         const currentUserData = localStorage.getItem('vinko-current-user');
         let currentUser = null;
@@ -254,8 +267,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         // VALIDAÇÃO DE INTEGRIDADE: Verificar se os dados pertencem ao usuário atual
         // Se o currentUser no localStorage não corresponde ao user_id autenticado, limpar dados
-        if (currentUser && currentUser.id !== storedUserId) {
-          console.warn('Dados de outro usuário detectados no localStorage. Limpando...');
+        if (currentUser && currentUser.id.toString() !== storedUserId) {
+          console.warn('Dados de outro usuário detectados no localStorage. Limpando...', {
+            currentUserId: currentUser.id,
+            storedUserId: storedUserId,
+            type: typeof currentUser.id,
+            storedType: typeof storedUserId
+          });
           localStorage.removeItem('vinko-current-user');
           localStorage.removeItem('vinko-users');
           localStorage.removeItem('vinko-data');
@@ -266,18 +284,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
         
-       // Carregar outros dados
-let parsedData = {};
-try {
-  const savedData = localStorage.getItem('vinko-data');
-  if (savedData && savedData !== 'undefined' && isMounted) {
-    parsedData = JSON.parse(savedData, dateReviver);
-  }
-} catch (err) {
-  // Erro ao fazer parse do vinko-data - limpar dados corrompidos
-  console.error('Erro ao carregar vinko-data. Limpando...', err);
-  localStorage.removeItem('vinko-data');
-}
+        // VALIDAÇÃO ADICIONAL: Verificar se há dados de usuário sem correspondência
+        if (!currentUser && (users.length > 0 || Object.keys(parsedData).length > 0)) {
+          console.warn('Dados órfãos detectados (sem usuário atual). Limpando...');
+          localStorage.removeItem('vinko-current-user');
+          localStorage.removeItem('vinko-users');
+          localStorage.removeItem('vinko-data');
+          
+          if (isMounted) {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+          return;
+        }
         
         // Combinar dados
         const finalData = {

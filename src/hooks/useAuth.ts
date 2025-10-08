@@ -77,6 +77,10 @@ export const useAuth = () => {
     dispatch({ type: 'SET_AUTH_ERROR', payload: null });
 
     try {
+      // IMPORTANTE: Limpar dados de usuário anterior antes do novo login
+      // Isso evita mistura de dados entre usuários
+      dispatch({ type: 'LOGOUT' });
+      
       const authData = await authService.login({ email, password });
       
       // Verificar se o email foi verificado

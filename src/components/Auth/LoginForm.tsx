@@ -28,6 +28,10 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword, onLogin, onBac
     setIsLoading(true);
 
     try {
+      // IMPORTANTE: Limpar dados de usuário anterior antes do novo login
+      // Isso evita mistura de dados entre usuários
+      dispatch({ type: 'LOGOUT' });
+      
       // Fazer login via API
       const authData = await authService.login({
         email: formData.email.toLowerCase().trim(),

@@ -139,13 +139,15 @@ export class DemandService extends BaseApiService {
       user_full_name: backendDemand.user_full_name,
       interested_professionals_count: backendDemand.interested_professionals_count,
       finalizedAt: backendDemand.finalized_at ? new Date(backendDemand.finalized_at) : undefined,
+      user_is_interested: backendDemand.user_is_interested,
     };
 
     console.log('Convertendo demanda:', {
       id: backendDemand.id,
       user_cellphone: backendDemand.user_cellphone,
       user_full_name: backendDemand.user_full_name,
-      hasPhone: !!backendDemand.user_cellphone
+      hasPhone: !!backendDemand.user_cellphone,
+      user_is_interested: backendDemand.user_is_interested
     });
 
     return frontendDemand;

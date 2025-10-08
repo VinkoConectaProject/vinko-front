@@ -288,10 +288,12 @@ export default function OpportunitiesPage({ onStartConversation, selectedDemandI
           demand.id === demandId 
             ? { 
                 ...demand, 
+                user_is_interested: true, // Marcar como interessado
                 interestedProfessionals: [
                   ...(demand.interestedProfessionals || []), 
                   { id: parseInt(currentUser.id), full_name: currentUser.full_name || 'Usuário' }
-                ]
+                ],
+                interested_professionals_count: (demand.interested_professionals_count || 0) + 1
               }
             : demand
         )
@@ -313,16 +315,14 @@ export default function OpportunitiesPage({ onStartConversation, selectedDemandI
   const isInterestedInDemand = (demandId: string) => {
     if (!currentUser?.id) return false;
     
-    // Verificar se o usuário atual está na lista de profissionais interessados
+    // Verificar se o usuário atual está interessado usando o campo user_is_interested da API
     const demand = opportunities.find(d => d.id === demandId);
-    if (!demand?.interestedProfessionals || !Array.isArray(demand.interestedProfessionals)) {
+    if (!demand) {
       return false;
     }
     
-    // Verificar se o ID do usuário atual está na lista de profissionais interessados
-    return demand.interestedProfessionals.some((professional: any) => 
-      professional.id === parseInt(currentUser.id)
-    );
+    // Usar o campo user_is_interested que vem diretamente da API
+    return demand.user_is_interested === true;
   };
 
   const clearFilters = async () => {
@@ -743,36 +743,41 @@ function OpportunityCard({
       onClick={onViewDetails}
     >
       <div className="flex justify-between items-start mb-4">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h3 
-            className="text-xl font-semibold text-gray-900 mb-2 line-clamp-1" 
+            className="text-xl font-semibold text-gray-900 mb-2 truncate" 
             title={demand.title}
           >
             {demand.title}
           </h3>
-          <div className="max-h-20 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 mb-4">
-            <p 
-              className="text-gray-600"
-              title={demand.description}
-            >
-              {demand.description}
-            </p>
-          </div>
+          <p 
+            className="text-gray-600 mb-4 line-clamp-2 overflow-hidden max-w-2xl"
+            title={demand.description}
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {demand.description}
+          </p>
           
           <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <User className="h-4 w-4 mr-1 flex-shrink-0" />
               <span 
-                className="truncate"
+                className="truncate max-w-32"
                 title={demand.serviceType || '-'}
               >
                 {demand.serviceType || '-'}
               </span>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
               <span 
-                className="truncate"
+                className="truncate max-w-24"
                 title={(() => {
                   const { city, state } = demand.location;
                   if (city && state) {
@@ -798,14 +803,14 @@ function OpportunityCard({
                 })()}
               </span>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <DollarSign className="h-4 w-4 mr-1 flex-shrink-0" />
               <span 
-                className="truncate"
+                className="truncate max-w-40"
                 title={demand.budget.min > 0 || demand.budget.max > 0 
                   ? (() => {
-                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
-                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString()}` : '';
+                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString('pt-BR')}` : '';
+                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString('pt-BR')}` : '';
                       if (min && max) {
                         return `Mín: ${min} - Máx: ${max}`;
                       } else if (min) {
@@ -820,8 +825,8 @@ function OpportunityCard({
               >
                 {demand.budget.min > 0 || demand.budget.max > 0 
                   ? (() => {
-                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString()}` : '';
-                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString()}` : '';
+                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString('pt-BR')}` : '';
+                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString('pt-BR')}` : '';
                       if (min && max) {
                         return `Mín: ${min} - Máx: ${max}`;
                       } else if (min) {
@@ -835,10 +840,10 @@ function OpportunityCard({
                 }
               </span>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <Clock className="h-4 w-4 mr-1 flex-shrink-0" />
               <span 
-                className="truncate"
+                className="truncate max-w-20"
                 title={demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
               >
                 {demand.deadline ? new Date(demand.deadline).toLocaleDateString('pt-BR') : '-'}
@@ -846,8 +851,8 @@ function OpportunityCard({
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center text-sm text-gray-500">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center text-sm text-gray-500 min-w-0">
               <Heart className="h-4 w-4 mr-1 flex-shrink-0" />
               <span 
                 className="truncate"
@@ -857,13 +862,13 @@ function OpportunityCard({
               </span>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onViewDetails();
                 }}
-                className="flex items-center px-3 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-sm"
+                className="flex items-center px-3 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-sm whitespace-nowrap"
               >
                 <Eye className="h-4 w-4 mr-1" />
                 Ver Detalhes
@@ -874,7 +879,7 @@ function OpportunityCard({
                   e.stopPropagation();
                   onContactWhatsApp(demand);
                 }}
-                className="flex items-center px-3 py-2 text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition-colors text-sm"
+                className="flex items-center px-3 py-2 text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition-colors text-sm whitespace-nowrap"
               >
                 <Phone className="h-4 w-4 mr-1" />
                 WhatsApp
@@ -885,7 +890,7 @@ function OpportunityCard({
                   e.stopPropagation();
                   onStartConversation(demand);
                 }}
-                className="flex items-center px-3 py-2 text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 transition-colors text-sm"
+                className="flex items-center px-3 py-2 text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 transition-colors text-sm whitespace-nowrap"
               >
                 <MessageCircle className="h-4 w-4 mr-1" />
                 Mensagem
@@ -894,7 +899,7 @@ function OpportunityCard({
               {isInterested ? (
                 <button
                   disabled
-                  className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg cursor-not-allowed text-sm"
+                  className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg cursor-not-allowed text-sm whitespace-nowrap"
                 >
                   <Heart className="h-4 w-4 mr-1 fill-current" />
                   Interessado
@@ -905,7 +910,7 @@ function OpportunityCard({
                     e.stopPropagation();
                     onShowInterest(demand.id);
                   }}
-                  className="flex items-center px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm"
+                  className="flex items-center px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm whitespace-nowrap"
                 >
                   <Heart className="h-4 w-4 mr-1" />
                   Interessar-se
@@ -988,7 +993,7 @@ function DemandDetailsModal({
           <div className="flex justify-between items-start">
             <div className="flex-1 min-w-0 pr-4">
               <h2 
-                className="text-2xl font-semibold text-gray-900 mb-2 overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100" 
+                className="text-2xl font-semibold text-gray-900 mb-2 truncate" 
                 title={demand.title}
               >
                 {demand.title}

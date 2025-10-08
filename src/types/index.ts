@@ -301,6 +301,7 @@ export interface BackendDemand {
   availability_name?: string;
   interested_professionals_count?: number;
   finalized_at?: string;
+  user_is_interested?: boolean;
 }
 
 export interface DemandsApiResponse {
@@ -393,6 +394,7 @@ export interface Demand {
   user_cellphone?: string;
   user_full_name?: string;
   interested_professionals_count?: number;
+  user_is_interested?: boolean;
 }
 
 export interface Notification {

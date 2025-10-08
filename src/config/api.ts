@@ -1,11 +1,11 @@
 // Obter URL base da API das variáveis de ambiente
 // No Vite, variáveis de ambiente devem começar com VITE_ para serem expostas ao cliente
 const getApiBaseUrl = (): string => {
-  const envUrl = import.meta.env.API_BASE_URL;
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
   
   // Se não houver variável de ambiente, usar URL padrão de desenvolvimento
   if (!envUrl) {
-    console.warn('⚠️ API_BASE_URL não definida! Usando URL padrão de desenvolvimento.');
+    console.warn('⚠️ VITE_API_BASE_URL não definida! Usando URL padrão de desenvolvimento.');
     return 'http://localhost:8000/api/v1';
   }
   

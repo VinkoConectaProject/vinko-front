@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppState, Conversation, Message, Rating, DjangoUser, AuthResponse } from '../types';
+import { User, ProfessionalProfile, ClientProfile, Demand, Notification, AppState, Conversation, Message, Rating, DjangoUser } from '../types';
 
 type AppAction = 
   | { type: 'SET_USER'; payload: User | null }
@@ -208,7 +208,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   // Reviver function to convert ISO date strings back to Date objects
-  const dateReviver = (key: string, value: any) => {
+  const dateReviver = (_key: string, value: unknown) => {
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/.test(value)) {
       return new Date(value);
     }
@@ -221,6 +221,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     const loadData = () => {
       try {
+        // VALIDAÇÃO: Verificar se há um usuário autenticado
+        const storedUserId = localStorage.getItem('user_id');
+        const accessToken = localStorage.getItem('access_token');
+        
+        // Se não há usuário autenticado, limpar todos os dados e não carregar nada
+        if (!storedUserId || !accessToken) {
+          console.log('Nenhum usuário autenticado. Limpando dados locais...');
+          localStorage.removeItem('vinko-current-user');
+          localStorage.removeItem('vinko-users');
+          localStorage.removeItem('vinko-data');
+          
+          if (isMounted) {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+          return;
+        }
+        
         // Carregar usuários cadastrados
         const usersData = localStorage.getItem('vinko-users');
         let users: User[] = [];
@@ -235,6 +252,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           currentUser = JSON.parse(currentUserData, dateReviver);
         }
         
+        // VALIDAÇÃO DE INTEGRIDADE: Verificar se os dados pertencem ao usuário atual
+        // Se o currentUser no localStorage não corresponde ao user_id autenticado, limpar dados
+        if (currentUser && currentUser.id !== storedUserId) {
+          console.warn('Dados de outro usuário detectados no localStorage. Limpando...');
+          localStorage.removeItem('vinko-current-user');
+          localStorage.removeItem('vinko-users');
+          localStorage.removeItem('vinko-data');
+          
+          if (isMounted) {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+          return;
+        }
+        
        // Carregar outros dados
 let parsedData = {};
 try {
@@ -242,8 +273,10 @@ try {
   if (savedData && savedData !== 'undefined' && isMounted) {
     parsedData = JSON.parse(savedData, dateReviver);
   }
-} catch (error) {
-  // Erro ao fazer parse do vinko-data
+} catch (err) {
+  // Erro ao fazer parse do vinko-data - limpar dados corrompidos
+  console.error('Erro ao carregar vinko-data. Limpando...', err);
+  localStorage.removeItem('vinko-data');
 }
         
         // Combinar dados
@@ -256,8 +289,12 @@ try {
         if (isMounted) {
           dispatch({ type: 'LOAD_DATA', payload: finalData });
         }
-      } catch (error) {
-        // Erro ao carregar dados
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        // Em caso de erro, limpar dados potencialmente corrompidos
+        localStorage.removeItem('vinko-current-user');
+        localStorage.removeItem('vinko-users');
+        localStorage.removeItem('vinko-data');
       } finally {
         if (isMounted) {
           // Delay maior para evitar piscamento
@@ -296,7 +333,7 @@ try {
           if (state.currentUser) {
             localStorage.setItem('vinko-current-user', JSON.stringify(state.currentUser));
           }
-        } catch (error) {
+        } catch {
           // Erro ao salvar dados
         }
       }, 1000); // Debounce de 1 segundo

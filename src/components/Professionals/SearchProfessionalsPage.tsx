@@ -10,6 +10,7 @@ import { RatingModal } from '../UI/RatingModal';
 import { ProfessionalProfileModal } from '../UI/ProfessionalProfileModal';
 import { ratingService } from '../../services/ratingService';
 import { ProfessionalSearchResult } from '../../types';
+import { API_CONFIG } from '../../config/api';
 
 interface ServiceOption {
   id: number;
@@ -317,7 +318,7 @@ export function SearchProfessionalsPage() {
         params.append('search', currentSearchTerm.trim());
       }
 
-      const response = await fetch(`https://vinko-api.fly.dev/api/v1/user/professionals/search/?${params.toString()}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/user/professionals/search/?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

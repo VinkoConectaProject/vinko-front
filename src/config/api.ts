@@ -1,5 +1,19 @@
+// Obter URL base da API das variáveis de ambiente
+// No Vite, variáveis de ambiente devem começar com VITE_ para serem expostas ao cliente
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  
+  // Se não houver variável de ambiente, usar URL padrão de desenvolvimento
+  if (!envUrl) {
+    console.warn('⚠️ VITE_API_BASE_URL não definida! Usando URL padrão de desenvolvimento.');
+    return 'http://localhost:8000/api/v1';
+  }
+  
+  return envUrl;
+};
+
 export const API_CONFIG = {
-  BASE_URL: 'https://vinko-api.fly.dev/api/v1',
+  BASE_URL: getApiBaseUrl(),
   ENDPOINTS: {
     AUTH: {
       LOGIN: '/user/login/',

@@ -178,7 +178,7 @@ class AuthService extends BaseApiService {
     
     try {
       return JSON.parse(userStr);
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -205,18 +205,55 @@ class AuthService extends BaseApiService {
 
   // Logout completo - limpa todos os dados de autenticação
   logout(): void {
+    console.log('Iniciando logout completo...');
+    
+    // 1. Limpar dados de autenticação
     this.clearAuthData();
     
-    // Limpar dados específicos do Vinko
+    // 2. Limpar dados específicos do Vinko
     localStorage.removeItem('vinko-current-user');
     localStorage.removeItem('vinko-users');
     localStorage.removeItem('vinko-data');
     
-    // Limpar dados de sessão
+    // 3. Limpar todos os dados de sessão
     sessionStorage.clear();
     
-    // Redirecionar para a página inicial
-    window.location.href = '/';
+    // 4. Limpar qualquer outro dado que possa estar armazenado
+    // Lista de todas as chaves que devem ser removidas
+    const keysToRemove = [
+      'vinko-current-user',
+      'vinko-users', 
+      'vinko-data',
+      'access_token',
+      'refresh_token',
+      'user_id',
+      'user_type',
+      'user'
+    ];
+    
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    // 5. Forçar limpeza do cache do navegador (apenas para dados do app)
+    // Isso garante que não haja dados residuais
+    try {
+      // Verificar se há outras chaves relacionadas ao Vinko
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (key.includes('vinko') || key.includes('token') || key.includes('user')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (err) {
+      console.error('Erro ao limpar localStorage:', err);
+    }
+    
+    console.log('Logout completo. Redirecionando...');
+    
+    // 6. Forçar reload completo da página para limpar memória
+    // Usar replace para não permitir voltar com o botão de voltar
+    window.location.replace('/');
   }
 
   // Verificar e renovar tokens automaticamente
@@ -273,7 +310,7 @@ class AuthService extends BaseApiService {
           return false;
         }
       }
-    } catch (error) {
+    } catch {
       this.logout();
       return false;
     }

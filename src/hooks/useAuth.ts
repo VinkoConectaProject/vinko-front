@@ -189,17 +189,22 @@ export const useAuth = () => {
   }, [dispatch]);
 
   const logout = useCallback(() => {
+    console.log('Hook useAuth: Iniciando processo de logout...');
+    
     // Limpar intervalo de verificação
     if (tokenCheckInterval.current) {
       clearInterval(tokenCheckInterval.current);
       tokenCheckInterval.current = null;
     }
     
-    // Fazer logout no contexto
+    // Fazer logout no contexto PRIMEIRO para limpar o estado React
     dispatch({ type: 'LOGOUT' });
     
-    // Fazer logout no serviço (que limpa localStorage e redireciona)
-    authService.logout();
+    // Aguardar um tick para garantir que o estado foi limpo
+    // Depois fazer logout no serviço (que limpa localStorage e redireciona)
+    setTimeout(() => {
+      authService.logout();
+    }, 100);
   }, [dispatch]);
 
   const isAuthenticated = useCallback(() => {

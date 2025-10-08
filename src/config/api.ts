@@ -1,12 +1,23 @@
 // Obter URL base da API das variáveis de ambiente
-// No Vite, variáveis de ambiente devem começar com VITE_ para serem expostas ao cliente
+// Compatível com Vercel e outras plataformas de deploy
 const getApiBaseUrl = (): string => {
+  // Tentar obter da variável de ambiente do Vite
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   
-  // Se não houver variável de ambiente, usar URL padrão de desenvolvimento
+  // Se não houver variável de ambiente, usar URL padrão baseada no ambiente
   if (!envUrl) {
-    console.warn('⚠️ VITE_API_BASE_URL não definida! Usando URL padrão de desenvolvimento.');
-    return 'http://localhost:8000/api/v1';
+    // Verificar se estamos em produção (Vercel define NODE_ENV=production)
+    const isProduction = import.meta.env.PROD;
+    
+    if (isProduction) {
+      // Em produção, usar a URL da API em produção
+      console.warn('⚠️ VITE_API_BASE_URL não definida em produção! Usando URL padrão de produção.');
+      return 'https://vinko-api.fly.dev/api/v1';
+    } else {
+      // Em desenvolvimento, usar localhost
+      console.warn('⚠️ VITE_API_BASE_URL não definida! Usando URL padrão de desenvolvimento.');
+      return 'http://localhost:8000/api/v1';
+    }
   }
   
   return envUrl;

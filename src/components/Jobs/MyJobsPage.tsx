@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Briefcase, Calendar, User, MessageSquare, CheckCircle, Clock, Star, DollarSign, X, MapPin, Heart } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import { useAuth } from '../../hooks/useAuth';
 import { demandService } from '../../services/demandService';
 import { Demand } from '../../types';
 
 export function MyJobsPage() {
   const { state } = useApp();
+  const { getCurrentUser, getUserId, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('active');
   const [activeJobs, setActiveJobs] = useState<Demand[]>([]);
   const [completedJobs, setCompletedJobs] = useState<Demand[]>([]);
@@ -19,32 +21,59 @@ export function MyJobsPage() {
   });
   const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
 
-  const currentUserId = parseInt(state.currentUser?.id || '0');
+  const currentUserId = parseInt(getUserId() || '0');
+
+  // Debug: verificar estado do usuário
+  console.log('MyJobsPage - Estado do usuário:', {
+    currentUser: state.currentUser,
+    djangoUser: state.djangoUser,
+    currentUserId,
+    hasUser: !!state.currentUser,
+    hasDjangoUser: !!state.djangoUser,
+    userType: state.currentUser?.type,
+    djangoUserType: state.djangoUser?.user_type,
+    authUserId: getUserId(),
+    authUser: getCurrentUser()
+  });
 
   // Carregar dados das demandas
-  const loadMyJobs = async () => {
-    if (!currentUserId) return;
+  const loadMyJobs = useCallback(async () => {
+    console.log('loadMyJobs chamado - currentUserId:', currentUserId);
+    
+    if (!currentUserId || currentUserId === 0) {
+      console.log('currentUserId não encontrado ou inválido:', currentUserId);
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {
+      console.log('Carregando trabalhos para usuário:', currentUserId);
+      
       // Carregar trabalhos ativos
       const activeResponse = await demandService.getMyJobs('EM ANDAMENTO', currentUserId);
-      setActiveJobs(activeResponse.results || []);
+      setActiveJobs(activeResponse.demands || []);
       
       // Carregar trabalhos concluídos
       const completedResponse = await demandService.getMyJobs('CONCLUÍDA', currentUserId);
-      setCompletedJobs(completedResponse.results || []);
+      setCompletedJobs(completedResponse.demands || []);
       
       // Carregar candidaturas (demandas onde o usuário está interessado mas não selecionado)
       const interestedResponse = await demandService.getMyJobs('ABERTA', undefined, currentUserId);
-      setInterestedJobs(interestedResponse.results || []);
+      setInterestedJobs(interestedResponse.demands || []);
       
       // Atualizar estatísticas
       setStats({
-        active: activeResponse.em_andamento || 0,
-        completed: completedResponse.concluidas || 0,
-        interested: interestedResponse.abertas || 0,
-        total: (activeResponse.em_andamento || 0) + (completedResponse.concluidas || 0) + (interestedResponse.abertas || 0)
+        active: activeResponse.counters.emAndamento || 0,
+        completed: completedResponse.counters.concluidas || 0,
+        interested: interestedResponse.counters.abertas || 0,
+        total: (activeResponse.counters.emAndamento || 0) + (completedResponse.counters.concluidas || 0) + (interestedResponse.counters.abertas || 0)
+      });
+      
+      console.log('Trabalhos carregados com sucesso:', {
+        active: activeResponse.demands.length,
+        completed: completedResponse.demands.length,
+        interested: interestedResponse.demands.length
       });
       
     } catch (error) {
@@ -52,11 +81,19 @@ export function MyJobsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUserId]);
 
   useEffect(() => {
-    loadMyJobs();
-  }, [currentUserId]);
+    console.log('useEffect executado - currentUserId:', currentUserId, 'isAuthenticated:', isAuthenticated, 'loadMyJobs:', loadMyJobs);
+    
+    if (isAuthenticated && currentUserId && currentUserId > 0) {
+      console.log('Usuário autenticado, chamando loadMyJobs...');
+      loadMyJobs();
+    } else {
+      console.log('Usuário não autenticado ou ID inválido, não carregando trabalhos. currentUserId:', currentUserId, 'isAuthenticated:', isAuthenticated);
+      setLoading(false);
+    }
+  }, [currentUserId, loadMyJobs, isAuthenticated]);
 
   const handleContactClient = (demand: Demand) => {
     if (demand.user_cellphone) {
@@ -197,10 +234,10 @@ export function MyJobsPage() {
                       </div>
                       <div className="flex items-center">
                         <DollarSign className="h-4 w-4 mr-1" />
-                        {parseFloat(job.min_budget) > 0 || parseFloat(job.max_budget) > 0 
+                        {job.budget.min > 0 || job.budget.max > 0 
                           ? (() => {
-                              const min = parseFloat(job.min_budget) > 0 ? `R$ ${parseFloat(job.min_budget).toLocaleString()}` : '';
-                              const max = parseFloat(job.max_budget) > 0 ? `R$ ${parseFloat(job.max_budget).toLocaleString()}` : '';
+                              const min = job.budget.min > 0 ? `R$ ${job.budget.min.toLocaleString('pt-BR')}` : '';
+                              const max = job.budget.max > 0 ? `R$ ${job.budget.max.toLocaleString('pt-BR')}` : '';
                               if (min && max) {
                                 return `Mín: ${min} - Máx: ${max}`;
                               } else if (min) {
@@ -276,10 +313,10 @@ export function MyJobsPage() {
                           </div>
                           <div className="flex items-center">
                             <DollarSign className="h-4 w-4 mr-1" />
-                        {parseFloat(job.min_budget) > 0 || parseFloat(job.max_budget) > 0 
+                        {job.budget.min > 0 || job.budget.max > 0 
                           ? (() => {
-                              const min = parseFloat(job.min_budget) > 0 ? `R$ ${parseFloat(job.min_budget).toLocaleString()}` : '';
-                              const max = parseFloat(job.max_budget) > 0 ? `R$ ${parseFloat(job.max_budget).toLocaleString()}` : '';
+                              const min = job.budget.min > 0 ? `R$ ${job.budget.min.toLocaleString('pt-BR')}` : '';
+                              const max = job.budget.max > 0 ? `R$ ${job.budget.max.toLocaleString('pt-BR')}` : '';
                               if (min && max) {
                                 return `Mín: ${min} - Máx: ${max}`;
                               } else if (min) {
@@ -294,7 +331,7 @@ export function MyJobsPage() {
                           </div>
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1" />
-                        Concluído em: {new Date(job.updated_at).toLocaleDateString('pt-BR')}
+                        Concluído em: {new Date(job.updatedAt).toLocaleDateString('pt-BR')}
                       </div>
                     </div>
                   </div>
@@ -356,10 +393,10 @@ export function MyJobsPage() {
                           </div>
                           <div className="flex items-center">
                             <DollarSign className="h-4 w-4 mr-1" />
-                          {parseFloat(job.min_budget) > 0 || parseFloat(job.max_budget) > 0 
+                          {job.budget.min > 0 || job.budget.max > 0 
                             ? (() => {
-                                const min = parseFloat(job.min_budget) > 0 ? `R$ ${parseFloat(job.min_budget).toLocaleString()}` : '';
-                                const max = parseFloat(job.max_budget) > 0 ? `R$ ${parseFloat(job.max_budget).toLocaleString()}` : '';
+                                const min = job.budget.min > 0 ? `R$ ${job.budget.min.toLocaleString('pt-BR')}` : '';
+                                const max = job.budget.max > 0 ? `R$ ${job.budget.max.toLocaleString('pt-BR')}` : '';
                                 if (min && max) {
                                   return `Mín: ${min} - Máx: ${max}`;
                                 } else if (min) {
@@ -486,14 +523,14 @@ function DemandDetailsModal({
                 {demand.title}
               </h2>
               <span className={`px-3 py-1 text-sm rounded-full font-medium ${
-                demand.status === 'ABERTA' ? 'bg-green-100 text-green-800' :
-                demand.status === 'EM ANDAMENTO' ? 'bg-yellow-100 text-yellow-800' :
-                demand.status === 'CONCLUÍDA' ? 'bg-blue-100 text-blue-800' :
+                demand.status === 'open' ? 'bg-green-100 text-green-800' :
+                demand.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                demand.status === 'completed' ? 'bg-blue-100 text-blue-800' :
                 'bg-red-100 text-red-800'
               }`}>
-                {demand.status === 'ABERTA' ? 'Demanda Aberta' :
-                 demand.status === 'EM ANDAMENTO' ? 'Em Andamento' :
-                 demand.status === 'CONCLUÍDA' ? 'Concluída' : 'Cancelada'}
+                {demand.status === 'open' ? 'Demanda Aberta' :
+                 demand.status === 'in_progress' ? 'Em Andamento' :
+                 demand.status === 'completed' ? 'Concluída' : 'Cancelada'}
               </span>
             </div>
             
@@ -525,11 +562,11 @@ function DemandDetailsModal({
                 <DollarSign className="h-4 w-4 mr-2 text-green-600" />
                 Orçamento
               </h3>
-              <p className={parseFloat(demand.min_budget) > 0 || parseFloat(demand.max_budget) > 0 ? "text-sm text-green-600" : "text-gray-500 text-xs"}>
-                {parseFloat(demand.min_budget) > 0 || parseFloat(demand.max_budget) > 0 
+              <p className={demand.budget.min > 0 || demand.budget.max > 0 ? "text-sm text-green-600" : "text-gray-500 text-xs"}>
+                {demand.budget.min > 0 || demand.budget.max > 0 
                   ? (() => {
-                      const min = parseFloat(demand.min_budget) > 0 ? `R$ ${parseFloat(demand.min_budget).toLocaleString()}` : '';
-                      const max = parseFloat(demand.max_budget) > 0 ? `R$ ${parseFloat(demand.max_budget).toLocaleString()}` : '';
+                      const min = demand.budget.min > 0 ? `R$ ${demand.budget.min.toLocaleString('pt-BR')}` : '';
+                      const max = demand.budget.max > 0 ? `R$ ${demand.budget.max.toLocaleString('pt-BR')}` : '';
                       if (min && max) {
                         return `Mín: ${min} - Máx: ${max}`;
                       } else if (min) {
@@ -563,14 +600,14 @@ function DemandDetailsModal({
                 <MapPin className="h-4 w-4 mr-2 text-orange-600" />
                 Localização
               </h3>
-              <p className={demand.city || demand.uf ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+              <p className={demand.location.city || demand.location.state ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
                 {(() => {
-                  if (demand.city && demand.uf) {
-                    return `${demand.city}, ${demand.uf}`;
-                  } else if (demand.city) {
-                    return demand.city;
-                  } else if (demand.uf) {
-                    return demand.uf;
+                  if (demand.location.city && demand.location.state) {
+                    return `${demand.location.city}, ${demand.location.state}`;
+                  } else if (demand.location.city) {
+                    return demand.location.city;
+                  } else if (demand.location.state) {
+                    return demand.location.state;
                   }
                   return 'Nenhuma localização informada';
                 })()}
@@ -582,8 +619,8 @@ function DemandDetailsModal({
                 <User className="h-4 w-4 mr-2 text-purple-600" />
                 Tipo de Serviço
               </h3>
-              <p className={demand.service_name ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
-                {demand.service_name || 'Nenhum tipo de serviço informado'}
+              <p className={demand.serviceType ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                {demand.serviceType || 'Nenhum tipo de serviço informado'}
               </p>
             </div>
 
@@ -594,8 +631,8 @@ function DemandDetailsModal({
                 </svg>
                 Área de Atuação
               </h3>
-              <p className={demand.area_name ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
-                {demand.area_name || 'Nenhuma área de atuação informada'}
+              <p className={demand.area ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                {demand.area || 'Nenhuma área de atuação informada'}
               </p>
             </div>
 
@@ -606,8 +643,8 @@ function DemandDetailsModal({
                 </svg>
                 Especialidade
               </h3>
-              <p className={demand.specialty_name ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
-                {demand.specialty_name || 'Nenhuma especialidade informada'}
+              <p className={demand.specialty ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                {demand.specialty || 'Nenhuma especialidade informada'}
               </p>
             </div>
 
@@ -618,8 +655,8 @@ function DemandDetailsModal({
                 </svg>
                 Tipo de Tecido
               </h3>
-              <p className={demand.tecid_type ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
-                {demand.tecid_type || 'Nenhum tipo de tecido informado'}
+              <p className={demand.tecidType ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                {demand.tecidType || 'Nenhum tipo de tecido informado'}
               </p>
             </div>
 
@@ -640,8 +677,8 @@ function DemandDetailsModal({
                 <Clock className="h-4 w-4 mr-2 text-red-600" />
                 Disponibilidade
               </h3>
-              <p className={demand.availability_name ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
-                {demand.availability_name || 'Nenhuma disponibilidade informada'}
+              <p className={demand.availability ? "text-sm text-gray-600" : "text-gray-500 text-xs"}>
+                {demand.availability || 'Nenhuma disponibilidade informada'}
               </p>
             </div>
           </div>
@@ -708,7 +745,7 @@ function DemandDetailsModal({
         <div className="p-6 border-t border-gray-200">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500 whitespace-nowrap">
-              Criada em {new Date(demand.created_at).toLocaleDateString('pt-BR')} | Atualizada em {new Date(demand.updated_at).toLocaleDateString('pt-BR')}
+              Criada em {new Date(demand.createdAt).toLocaleDateString('pt-BR')} | Atualizada em {new Date(demand.updatedAt).toLocaleDateString('pt-BR')}
             </div>
             <button
               onClick={onClose}

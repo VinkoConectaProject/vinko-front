@@ -5,7 +5,6 @@ import { DjangoUser } from '../types';
 
 export const useAuth = () => {
   const { state, dispatch } = useApp();
-  const tokenCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const isInitializing = useRef(false);
 
   // Verificar e renovar tokens automaticamente
@@ -70,21 +69,8 @@ export const useAuth = () => {
     initializeAuth();
   }, []); // Removida dependência checkAndRefreshTokens
 
-  // Configurar verificação periódica de tokens
-  useEffect(() => {
-    if (authService.isAuthenticated()) {
-      // Verificar a cada 5 minutos
-      tokenCheckInterval.current = setInterval(async () => {
-        await checkAndRefreshTokens();
-      }, 5 * 60 * 1000); // 5 minutos
-    }
-
-    return () => {
-      if (tokenCheckInterval.current) {
-        clearInterval(tokenCheckInterval.current);
-      }
-    };
-  }, [checkAndRefreshTokens]);
+  // Verificação periódica de tokens removida conforme solicitado pelo usuário
+  // useEffect removido para evitar chamadas desnecessárias ao endpoint users/me/
 
   const login = useCallback(async (email: string, password: string) => {
     dispatch({ type: 'SET_AUTH_LOADING', payload: true });
@@ -190,12 +176,6 @@ export const useAuth = () => {
 
   const logout = useCallback(() => {
     console.log('Hook useAuth: Iniciando processo de logout...');
-    
-    // Limpar intervalo de verificação
-    if (tokenCheckInterval.current) {
-      clearInterval(tokenCheckInterval.current);
-      tokenCheckInterval.current = null;
-    }
     
     // Fazer logout no contexto PRIMEIRO para limpar o estado React
     dispatch({ type: 'LOGOUT' });

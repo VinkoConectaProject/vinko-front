@@ -856,9 +856,9 @@ function OpportunityCard({
               <Heart className="h-4 w-4 mr-1 flex-shrink-0" />
               <span 
                 className="truncate"
-                title={`${demand.interestedProfessionals?.length || 0} interessados`}
+                title={`${demand.interested_professionals_count || 0} interessados`}
               >
-                {demand.interestedProfessionals?.length || 0} interessados
+                {demand.interested_professionals_count || 0} interessados
               </span>
             </div>
             

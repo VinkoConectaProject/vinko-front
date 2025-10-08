@@ -272,8 +272,18 @@ export class DemandService extends BaseApiService {
       ? `${API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS}?${params.toString()}`
       : API_CONFIG.ENDPOINTS.DEMANDS.DEMANDS;
     
-    const response = await this.makeRequest<DemandsWithCounters>(url);
-    return response.data;
+    const response = await this.makeRequest<DemandsApiResponse['data']>(url);
+    
+    // Converter dados do backend para o formato do frontend
+    const demands = response.data.results.map(demand => this.convertBackendDemandToFrontend(demand));
+    const counters = {
+      total: response.data.total,
+      abertas: response.data.abertas,
+      emAndamento: response.data.em_andamento,
+      concluidas: response.data.concluidas,
+    };
+
+    return { demands, counters };
   }
 
   /**

@@ -57,6 +57,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_USER': {
   // se trocou de usuário, zera o resto do estado para não vazar dados do anterior
+  console.log('[VINKO] SET_USER chamado', { prevId, nextId });
   const prevId = state.currentUser?.id?.toString();
   const nextId = action.payload?.id?.toString();
 
@@ -230,6 +231,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 }
 function clearLocalData() {
   try {
+    console.log('[VINKO] clearLocalData rodou — dados locais apagados');
     localStorage.removeItem('vinko-current-user');
     localStorage.removeItem('vinko-users');
     localStorage.removeItem('vinko-data');
@@ -241,6 +243,14 @@ function clearLocalData() {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  useEffect(() => {
+    (window as any).vinkoReset = () => {
+      clearLocalData();
+      dispatch({ type: 'RESET_ALL' });
+    };
+  }, []);
+
 
   // Reviver function to convert ISO date strings back to Date objects
   const dateReviver = (_key: string, value: unknown) => {
@@ -262,6 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         // Se não há usuário autenticado, limpar todos os dados e não carregar nada
         if (!storedUserId || !accessToken) {
+          console.log('[VINKO] loadData -> RESET_ALL (sem usuário autenticado)');
           clearLocalData();
         if (isMounted) {
           dispatch({ type: 'RESET_ALL' });

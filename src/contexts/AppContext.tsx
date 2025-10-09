@@ -295,19 +295,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
           users = JSON.parse(usersData, dateReviver);
         }
         
-        // Carregar outros dados primeiro
+        // Carregar dados NOMEADOS pelo usuário logado
         let parsedData = {};
         try {
-          const savedData = localStorage.getItem('vinko-data');
+          // lê APENAS os dados do usuário autenticado atual
+          const savedData = storedUserId
+            ? localStorage.getItem(`vinko-data:${storedUserId}`)
+            : null;
+        
           if (savedData && savedData !== 'undefined' && isMounted) {
             parsedData = JSON.parse(savedData, dateReviver);
           }
-        } catch (err) {
-          // Erro ao fazer parse do vinko-data - limpar dados corrompidos
-          console.error('Erro ao carregar vinko-data. Limpando...', err);
-          localStorage.removeItem('vinko-data');
-        }
         
+          // limpeza de legado: se ainda existir a chave antiga, remove para não confundir
+          localStorage.removeItem('vinko-data');
+        } catch (err) {
+          console.error('Erro ao carregar vinko-data:<userId>. Limpando...', err);
+          if (storedUserId) localStorage.removeItem(`vinko-data:${storedUserId}`);
+        }
+
+      
         // Carregar usuário atual
         const currentUserData = localStorage.getItem('vinko-current-user');
         let currentUser = null;
@@ -379,15 +386,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const timeoutId = setTimeout(() => {
         try {
           localStorage.setItem('vinko-users', JSON.stringify(state.users));
-          localStorage.setItem('vinko-data', JSON.stringify({
-            professionalProfiles: state.professionalProfiles,
-            clientProfiles: state.clientProfiles,
-            demands: state.demands,
-            notifications: state.notifications,
-            conversations: state.conversations,
-            messages: state.messages,
-            ratings: state.ratings,
-          }));
+          // Só salva se soubermos quem é o usuário atual
+          if (state.currentUser?.id != null) {
+            const nsKey = `vinko-data:${state.currentUser.id}`;
+            localStorage.setItem(nsKey, JSON.stringify({
+              professionalProfiles: state.professionalProfiles,
+              clientProfiles: state.clientProfiles,
+              demands: state.demands,
+              notifications: state.notifications,
+              conversations: state.conversations,
+              messages: state.messages,
+              ratings: state.ratings,
+            }));
+          }
+          // remove a chave antiga global (legado), caso ainda exista
+          localStorage.removeItem('vinko-data');
+
           
           if (state.currentUser) {
             localStorage.setItem('vinko-current-user', JSON.stringify(state.currentUser));

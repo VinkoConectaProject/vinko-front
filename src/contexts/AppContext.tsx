@@ -29,7 +29,8 @@ type AppAction =
   | { type: 'CLEANUP_OLD_DATA'; payload: { messages: Message[]; conversations: Conversation[] } }
   | { type: 'ADD_RATING'; payload: Rating }
   | { type: 'LOAD_DATA'; payload: Partial<AppState> }
-  | { type: 'LOGOUT' };
+  | { type: 'LOGOUT' }
+  | { type: 'RESET_ALL' };
 
 const initialState: AppState = {
   currentUser: null,

@@ -270,16 +270,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const storedUserId = localStorage.getItem('user_id');
         const accessToken = localStorage.getItem('access_token');
         
-        // Se não há usuário autenticado, limpar todos os dados e não carregar nada
+        // Se ainda não há usuário autenticado, **não** reseta agora
+        // (evita tela branca durante o handshake do login)
         if (!storedUserId || !accessToken) {
-          console.log('[VINKO] loadData -> RESET_ALL (sem usuário autenticado)');
-          clearLocalData();
-        if (isMounted) {
-          dispatch({ type: 'RESET_ALL' });
+          if (isMounted) {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+          return;
         }
-        return;
-        }
-
         
         // Carregar usuários cadastrados
         const usersData = localStorage.getItem('vinko-users');

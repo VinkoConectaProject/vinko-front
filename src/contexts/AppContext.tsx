@@ -56,24 +56,33 @@ const AppContext = createContext<{
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_USER': {
-  // se trocou de usuário, zera o resto do estado para não vazar dados do anterior
-  console.log('[VINKO] SET_USER chamado', { prevId, nextId });
-  const prevId = state.currentUser?.id?.toString();
-  const nextId = action.payload?.id?.toString();
+  // ids atual e novo (se existirem)
+  const prevId = state.currentUser?.id ? String(state.currentUser.id) : null;
+  const nextId = action.payload?.id ? String(action.payload.id) : null;
 
+  // (opcional) log de depuração – agora depois das variáveis
+  // console.log('[VINKO] SET_USER chamado', { prevId, nextId });
+
+  // se estiver "deslogando" (payload null), só limpa o currentUser
+  if (action.payload === null) {
+    return { ...state, currentUser: null };
+  }
+
+  // se trocou de usuário (prevId e nextId existem e são diferentes), zera o resto do estado
   if (prevId && nextId && prevId !== nextId) {
     return {
-      ...initialState,                 // limpa tudo
-      currentUser: action.payload,     // coloca o novo usuário
+      ...initialState,              // limpa tudo
+      currentUser: action.payload,  // define o novo usuário
       isLoading: false,
       authLoading: false,
       authError: null,
     };
   }
 
-  // mesmo usuário? só atualiza
+  // mesmo usuário ou primeiro login: apenas atualiza
   return { ...state, currentUser: action.payload };
 }
+
     case 'SET_DJANGO_USER':
       return { ...state, djangoUser: action.payload };
     case 'UPDATE_DJANGO_USER':

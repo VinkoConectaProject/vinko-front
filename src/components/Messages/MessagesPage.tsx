@@ -148,6 +148,45 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
     }
   };
 
+  // Função para atualizar uma conversa específica na lista (mover para o topo)
+  const updateConversationInList = useCallback((conversationId: number, updatedConversation?: ApiConversation) => {
+    console.log('🔄 Atualizando conversa na lista:', conversationId);
+    
+    const updateConversationList = (conversations: ApiConversation[]) => {
+      // Encontrar a conversa atual
+      const currentConversation = conversations.find(c => c.id === conversationId);
+      if (!currentConversation) return conversations;
+      
+      // Remover a conversa da lista
+      const filteredConversations = conversations.filter(c => c.id !== conversationId);
+      
+      // Atualizar dados da conversa se fornecido
+      const conversationToMove = updatedConversation || currentConversation;
+      
+      // Adicionar no topo da lista
+      return [conversationToMove, ...filteredConversations];
+    };
+    
+    // Atualizar todas as listas
+    setAllConversations(prev => updateConversationList(prev));
+    setUnreadConversations(prev => updateConversationList(prev));
+    setArchivedConversations(prev => updateConversationList(prev));
+    
+    // Atualizar lista ativa baseado no filtro atual
+    switch (filterStatus) {
+      case 'unread':
+        setConversations(prev => updateConversationList(prev));
+        break;
+      case 'archived':
+        setConversations(prev => updateConversationList(prev));
+        break;
+      default:
+        setConversations(prev => updateConversationList(prev));
+    }
+    
+    console.log('✅ Conversa movida para o topo da lista');
+  }, [filterStatus]);
+
   // Função para atualizar contadores de conversas
   const updateConversationCounters = async () => {
     try {
@@ -277,7 +316,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
   };
 
   // Função para adicionar mensagem sutilmente (sem refresh)
-  const addMessageSubtly = (newMessage: ConversationMessage) => {
+  const addMessageSubtly = useCallback((newMessage: ConversationMessage) => {
     setConversationMessages(prevMessages => {
       // Verificar se a mensagem já existe (evitar duplicatas)
       const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
@@ -288,7 +327,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
       // Adicionar nova mensagem no final
       return [...prevMessages, newMessage];
     });
-  };
+  }, []);
 
   // Função para remover mensagem sutilmente (sem refresh)
   const removeMessageSubtly = (messageId: number) => {
@@ -316,6 +355,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
       const conversation = conversations.find(c => c.id.toString() === selectedConversationId);
       if (conversation) {
         setSelectedConversation(conversation);
+        setNewMessage(''); // Limpar input de mensagem ao selecionar conversa via props
         markMessagesAsRead(conversation.id.toString());
       }
     }
@@ -333,18 +373,44 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
           messagingService.getUnreadConversations() // Aba Não lidas
         ]);
         
-        // Forçar atualização com spread operator
-        setAllConversations([...allResponse.data]);
-        setUnreadConversations([...unreadResponse.data]);
+        // Verificar se há mudanças nas conversas antes de atualizar
+        const hasChanges = JSON.stringify(allResponse.data) !== JSON.stringify(allConversations);
         
-        // Atualizar a lista ativa se estiver nas abas "Todas" ou "Não lidas"
-        if (filterStatus === 'all') {
-          setConversations([...allResponse.data]);
-        } else if (filterStatus === 'unread') {
-          setConversations([...unreadResponse.data]);
+        if (hasChanges) {
+          console.log('📝 Polling: Detectadas mudanças nas conversas, atualizando...');
+          
+          // Forçar atualização com spread operator
+          setAllConversations([...allResponse.data]);
+          setUnreadConversations([...unreadResponse.data]);
+          
+          // Atualizar a lista ativa se estiver nas abas "Todas" ou "Não lidas"
+          if (filterStatus === 'all') {
+            setConversations([...allResponse.data]);
+          } else if (filterStatus === 'unread') {
+            setConversations([...unreadResponse.data]);
+          }
+          
+          // Verificar se há mensagens novas na conversa atual
+          if (selectedConversation) {
+            const updatedConversation = allResponse.data.find(c => c.id === selectedConversation.id);
+            if (updatedConversation && updatedConversation.last_message) {
+              const lastMessageTime = new Date(updatedConversation.last_message.created_at);
+              const currentLastMessageTime = selectedConversation.last_message ? 
+                new Date(selectedConversation.last_message.created_at) : new Date(0);
+              
+              // Se há mensagem nova, adicionar sutilmente
+              if (lastMessageTime > currentLastMessageTime) {
+                console.log('📨 Polling: Nova mensagem detectada, adicionando sutilmente...');
+                addMessageSubtly(updatedConversation.last_message);
+                updateConversationInList(selectedConversation.id, updatedConversation);
+              }
+            }
+          }
+          
+          console.log('✅ Polling: Conversas atualizadas com sucesso');
+        } else {
+          console.log('⏭️ Polling: Nenhuma mudança detectada, pulando atualização');
         }
-        
-        console.log('✅ Polling: Conversas atualizadas com sucesso');
       } catch (err) {
         console.error('❌ Erro no polling de conversas:', err);
       }
@@ -361,7 +427,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
       console.log('🧹 Limpando polling de conversas');
       clearInterval(intervalId);
     };
-  }, [filterStatus]); // Re-executar quando o filtro mudar
+  }, [filterStatus, allConversations, selectedConversation, updateConversationInList, addMessageSubtly]); // Re-executar quando o filtro mudar
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -387,11 +453,24 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
         addMessageSubtly(response.data);
       }
       
-      // Atualizar contadores e resultados de busca (sem recarregar mensagens)
-      await Promise.all([
-        updateConversationCounters(),
-        updateSearchResults()
-      ]);
+      // Atualizar conversa na lista (mover para o topo) com dados atualizados
+      if (response.data && response.data.conversation) {
+        // Buscar dados atualizados da conversa
+        try {
+          const updatedConversationResponse = await messagingService.getAllConversations();
+          const updatedConversation = updatedConversationResponse.data.find(c => c.id === selectedConversation.id);
+          if (updatedConversation) {
+            updateConversationInList(selectedConversation.id, updatedConversation);
+          }
+        } catch (error) {
+          console.warn('Erro ao buscar conversa atualizada:', error);
+          // Se falhar, apenas mover a conversa atual para o topo
+          updateConversationInList(selectedConversation.id);
+        }
+      }
+      
+      // Atualizar resultados de busca se necessário
+      await updateSearchResults();
 
       // Scroll para baixo após enviar
       scrollToBottom();
@@ -692,6 +771,7 @@ export function MessagesPage({ selectedConversationId, onStartConversation }: Me
                         <button
                           onClick={() => {
                             setSelectedConversation(conversation);
+                            setNewMessage(''); // Limpar input de mensagem ao mudar de conversa
                             loadConversationMessages(conversation.id);
                           }}
                           className="flex-1 p-4 text-left transition-colors min-w-0"

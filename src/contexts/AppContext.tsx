@@ -55,8 +55,24 @@ const AppContext = createContext<{
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case 'SET_USER':
-      return { ...state, currentUser: action.payload };
+    case 'SET_USER': {
+  // se trocou de usuário, zera o resto do estado para não vazar dados do anterior
+  const prevId = state.currentUser?.id?.toString();
+  const nextId = action.payload?.id?.toString();
+
+  if (prevId && nextId && prevId !== nextId) {
+    return {
+      ...initialState,                 // limpa tudo
+      currentUser: action.payload,     // coloca o novo usuário
+      isLoading: false,
+      authLoading: false,
+      authError: null,
+    };
+  }
+
+  // mesmo usuário? só atualiza
+  return { ...state, currentUser: action.payload };
+}
     case 'SET_DJANGO_USER':
       return { ...state, djangoUser: action.payload };
     case 'UPDATE_DJANGO_USER':
@@ -200,9 +216,27 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'LOAD_DATA':
       return { ...state, ...action.payload };
+    case 'RESET_ALL':
+      return {
+        ...initialState,
+        isLoading: false,
+        authLoading: false,
+        authError: null,
+      };
+
     default:
       return state;
   }
+}
+function clearLocalData() {
+  try {
+    localStorage.removeItem('vinko-current-user');
+    localStorage.removeItem('vinko-users');
+    localStorage.removeItem('vinko-data');
+    localStorage.removeItem('vinko:clientDraft');
+    localStorage.removeItem('vinko:clientForm');
+    sessionStorage.clear();
+  } catch {}
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -228,16 +262,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         // Se não há usuário autenticado, limpar todos os dados e não carregar nada
         if (!storedUserId || !accessToken) {
-          console.log('Nenhum usuário autenticado. Limpando dados locais...');
-          localStorage.removeItem('vinko-current-user');
-          localStorage.removeItem('vinko-users');
-          localStorage.removeItem('vinko-data');
-          
-          if (isMounted) {
-            dispatch({ type: 'SET_LOADING', payload: false });
-          }
-          return;
+          clearLocalData();
+        if (isMounted) {
+          dispatch({ type: 'RESET_ALL' });
         }
+        return;
+        }
+
         
         // Carregar usuários cadastrados
         const usersData = localStorage.getItem('vinko-users');
@@ -267,36 +298,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         
         // VALIDAÇÃO DE INTEGRIDADE: Verificar se os dados pertencem ao usuário atual
-        // Se o currentUser no localStorage não corresponde ao user_id autenticado, limpar dados
-        if (currentUser && currentUser.id.toString() !== storedUserId) {
-          console.warn('Dados de outro usuário detectados no localStorage. Limpando...', {
-            currentUserId: currentUser.id,
-            storedUserId: storedUserId,
-            type: typeof currentUser.id,
-            storedType: typeof storedUserId
-          });
-          localStorage.removeItem('vinko-current-user');
-          localStorage.removeItem('vinko-users');
-          localStorage.removeItem('vinko-data');
-          
-          if (isMounted) {
-            dispatch({ type: 'SET_LOADING', payload: false });
+        
+          // Se o currentUser no localStorage não corresponde ao user_id autenticado, limpar dados
+          if (currentUser && currentUser.id.toString() !== storedUserId) {
+            console.warn('Dados de outro usuário detectados. Limpando...');
+            clearLocalData();
+            if (isMounted) {
+              dispatch({ type: 'RESET_ALL' });
+            }
+            return;
           }
-          return;
-        }
+
         
         // VALIDAÇÃO ADICIONAL: Verificar se há dados de usuário sem correspondência
         if (!currentUser && (users.length > 0 || Object.keys(parsedData).length > 0)) {
           console.warn('Dados órfãos detectados (sem usuário atual). Limpando...');
-          localStorage.removeItem('vinko-current-user');
-          localStorage.removeItem('vinko-users');
-          localStorage.removeItem('vinko-data');
-          
+          clearLocalData();
           if (isMounted) {
-            dispatch({ type: 'SET_LOADING', payload: false });
+            dispatch({ type: 'RESET_ALL' });
           }
           return;
         }
+
         
         // Combinar dados
         const finalData = {
@@ -310,11 +333,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
-        // Em caso de erro, limpar dados potencialmente corrompidos
-        localStorage.removeItem('vinko-current-user');
-        localStorage.removeItem('vinko-users');
-        localStorage.removeItem('vinko-data');
+        // Em caso de erro, limpeza segura
+        clearLocalData();
       } finally {
+
         if (isMounted) {
           // Delay maior para evitar piscamento
           setTimeout(() => {

@@ -1661,7 +1661,11 @@ function CandidatesModal({ demand, onClose, onProfessionalSelectionChange }: Can
   const checkSelectedProfessional = useCallback(async () => {
     try {
       const selectedProfessional = await demandService.getChosenProfessional(parseInt(demand.id));
-      setSelectedProfessionalId(selectedProfessional.id);
+      if (selectedProfessional && selectedProfessional.id) {
+        setSelectedProfessionalId(selectedProfessional.id);
+      } else {
+        setSelectedProfessionalId(null);
+      }
     } catch {
       // Se não há profissional selecionado, o endpoint retorna 404
       setSelectedProfessionalId(null);

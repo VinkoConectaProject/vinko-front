@@ -17,7 +17,8 @@ export function CTASection({ onNavigateToAuth }: CTASectionProps) {
   const [states, setStates] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [isUpgrading, setIsUpgrading] = useState(false);
   // Estados para filtros selecionados
   const [selectedService, setSelectedService] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
@@ -54,7 +55,41 @@ export function CTASection({ onNavigateToAuth }: CTASectionProps) {
       setIsLoadingClients(false);
     }
   };
+const handleUpgradeToPro = () => {
+    if (!state.currentUser) {
+      onNavigateToAuth('register');
+      return;
+    }
 
+    if (state.currentUser.type !== 'client') {
+      return;
+    }
+
+    setIsUpgrading(true);
+
+    const clientProfile = state.clientProfiles.find(p => p.userId === state.currentUser?.id);
+
+    if (clientProfile) {
+      const updatedProfile = {
+        ...clientProfile,
+        subscription: {
+          plan: 'pro' as const,
+          status: 'active' as const,
+          stripeCustomerId: 'cus_' + Date.now(),
+          stripeSubscriptionId: 'sub_' + Date.now(),
+          currentPeriodEnd: new Date(Date.now() + (selectedPlan === 'annual' ? 365 : 30) * 24 * 60 * 60 * 1000),
+          cancelAtPeriodEnd: false
+        }
+      };
+
+      dispatch({ type: 'UPDATE_CLIENT_PROFILE', payload: updatedProfile });
+
+      setTimeout(() => {
+        setIsUpgrading(false);
+        alert('Plano PRO ativado com sucesso! Agora você pode buscar profissionais.');
+      }, 1000);
+    }
+  };
   // Carregar clientes inicialmente
   useEffect(() => {
     searchClients();
@@ -479,6 +514,153 @@ export function CTASection({ onNavigateToAuth }: CTASectionProps) {
             Quero me cadastrar agora
           </button>
         </div>
+
+         {/* Plans */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-16">
+          {/* Free Plan */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Search className="h-8 w-8 text-gray-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Plano Free</h3>
+              <div className="text-4xl font-bold text-gray-900 mb-2">
+                Grátis
+              </div>
+              <p className="text-gray-600">Para sempre</p>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              {[
+                'Publicar demandas ilimitadas',
+                'Receber propostas de profissionais',
+                'Sistema de mensagens interno',
+                'Gerenciar projetos',
+                'Suporte por email'
+              ].map((feature, index) => (
+                <div key={index} className="flex items-center text-gray-600">
+                  <Check className="h-5 w-5 text-green-600 mr-3 flex-shrink-0" />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 pt-6 mb-8">
+              <h4 className="font-semibold text-gray-900 mb-4">Limitações:</h4>
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>• Não pode buscar profissionais ativamente</p>
+                <p>• Sem acesso ao diretório de prestadores</p>
+                <p>• Sem contato direto via WhatsApp</p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleRegister}
+              className="w-full bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+            >
+              Começar Grátis
+            </button>
+          </div>
+
+          {/* PRO Plan */}
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-pink-500 p-8 relative">
+            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+              <span className="bg-pink-500 text-white px-6 py-2 rounded-full text-sm font-medium">
+                Mais Popular
+              </span>
+            </div>
+
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Crown className="h-8 w-8 text-pink-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Plano PRO</h3>
+              
+              {/* Plan Toggle */}
+              <div className="flex items-center justify-center space-x-4 mb-6">
+                <button
+                  onClick={() => setSelectedPlan('monthly')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    selectedPlan === 'monthly'
+                      ? 'bg-pink-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Mensal
+                </button>
+                <button
+                  onClick={() => setSelectedPlan('annual')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors relative ${
+                    selectedPlan === 'annual'
+                      ? 'bg-pink-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Anual
+                  <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                    -17%
+                  </span>
+                </button>
+              </div>
+
+              <div className="text-4xl font-bold text-pink-600 mb-2">
+                R$ {selectedPlan === 'monthly' ? '29,90' : '24,90'}
+              </div>
+              <p className="text-gray-600 mb-2">
+                {selectedPlan === 'monthly' ? 'por mês' : 'por mês (cobrado anualmente)'}
+              </p>
+              
+              {selectedPlan === 'annual' && (
+                <div className="text-sm text-green-600 font-medium">
+                  Total: R$ 299,00 • Economize 2 meses
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 mb-8">
+              {[
+                'Tudo do plano Free',
+                'Buscar profissionais ilimitado',
+                'Acesso completo ao diretório',
+                'Contato direto via WhatsApp',
+                'Filtros avançados de busca',
+                'Suporte prioritário',
+                'Relatórios detalhados'
+              ].map((feature, index) => (
+                <div key={index} className="flex items-center text-gray-600">
+                  <Check className="h-5 w-5 text-green-600 mr-3 flex-shrink-0" />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleUpgradeToPro}
+              disabled={isUpgrading}
+              className="w-full bg-pink-500 text-white py-3 rounded-lg hover:bg-pink-600 transition-colors font-medium flex items-center justify-center disabled:opacity-50"
+            >
+              {isUpgrading ? (
+                'Processando...'
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Assinar Plano PRO
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+{/* Payment Security */}
+        <div className="mt-16 text-center">
+          <div className="flex items-center justify-center space-x-8 text-gray-500">
+            <div className="flex items-center space-x-2">
+              <CreditCard className="h-5 w-5" />
+              <span className="text-sm">Pagamento seguro via Stripe</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Check className="h-5 w-5 text-green-600" />
+              <span className="text-sm">Cancele quando quiser</span>
+            </div>
       </div>
     </section>
   );

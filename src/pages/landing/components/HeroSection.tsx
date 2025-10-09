@@ -33,7 +33,7 @@ export function HeroSection({ onNavigateToAuth }: HeroSectionProps) {
 
             {/* Subtitle */}
             <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              Costureiras, modelistas, facções, designers... tudo isso e
+              Costureiras, Modelistas, Estilistas, Confecções... tudo isso e
               <br />
               muito mais em um só lugar.
             </p>
@@ -72,8 +72,6 @@ export function HeroSection({ onNavigateToAuth }: HeroSectionProps) {
               {/* Status Tabs */}
               <div className="flex space-x-2 mb-4">
                 <span className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aberta</span>
-                <span className="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Contactada</span>
-                <span className="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Aceita</span>
               </div>
 
               {/* Service Details */}
@@ -94,16 +92,16 @@ export function HeroSection({ onNavigateToAuth }: HeroSectionProps) {
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <MapPin className="w-4 h-4 mr-2 text-pink-500" />
-                  <span>Belo Horizonte - MG</span>
+                  <span>Florianópolis - SC</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Phone className="w-4 h-4 mr-2 text-pink-500" />
-                  <span>(31) 9 9999-9999</span>
+                  <span>(99) 9 9999-9999</span>
                   <span className="ml-auto text-green-600 font-medium">R$ 4.500</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Mail className="w-4 h-4 mr-2 text-pink-500" />
-                  <span>contato@profissional.com</span>
+                  <span>email@email.com.br</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Calendar className="w-4 h-4 mr-2 text-pink-500" />
@@ -111,18 +109,11 @@ export function HeroSection({ onNavigateToAuth }: HeroSectionProps) {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex space-x-2">
-                <button className="flex-1 bg-pink-500 text-white py-2 px-4 rounded-lg text-sm font-medium">
-                  Entrar em contato
-                </button>
-                <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600">
-                  Classificar
-                </button>
-                <button className="bg-pink-500 text-white py-2 px-4 rounded-lg text-sm font-medium">
-                  Entrar em contato
-                </button>
-              </div>
+             <div className="flex justify-center">
+              <button className="bg-pink-500 text-white py-2 px-6 rounded-lg text-sm font-medium max-w-[220px] w-full hover:bg-pink-600 transition">
+                Entrar em contato
+              </button>
+            </div>
             </div>
           </div>
         </div>

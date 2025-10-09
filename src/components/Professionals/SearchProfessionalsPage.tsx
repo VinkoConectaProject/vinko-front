@@ -269,6 +269,21 @@ export function SearchProfessionalsPage() {
   const [showRatingFromProfile, setShowRatingFromProfile] = useState(false);
   const [profileRefreshTrigger, setProfileRefreshTrigger] = useState(0);
 
+  // Função para verificar se um profissional deve ser exibido (tem todos os campos obrigatórios)
+  const shouldShowProfessional = (professional: ProfessionalSearchResult): boolean => {
+    // Verificar se todos os campos obrigatórios estão preenchidos
+    const hasFullName = Boolean(professional.full_name && professional.full_name.trim() !== '');
+    const hasServices = Boolean(professional.services && professional.services.length > 0);
+    const hasAreas = Boolean(professional.areas && professional.areas.length > 0);
+    const hasSpecialties = Boolean(professional.specialties && professional.specialties.length > 0);
+    const hasTecidType = Boolean(professional.tecid_type && professional.tecid_type.trim() !== '');
+    const hasLocation = Boolean((professional.uf && professional.uf.trim() !== '') || (professional.city && professional.city.trim() !== ''));
+    const hasEmail = Boolean(professional.email && professional.email.trim() !== '');
+    const hasAvailability = professional.availability !== null && professional.availability !== undefined;
+
+    return hasFullName && hasServices && hasAreas && hasSpecialties && hasTecidType && hasLocation && hasEmail && hasAvailability;
+  };
+
   // Função para buscar profissionais
   const searchProfessionals = async (customSearchTerm?: string, customFilters?: SearchFilters): Promise<ProfessionalSearchResult[]> => {
     try {
@@ -1035,11 +1050,11 @@ export function SearchProfessionalsPage() {
 
 
 
-      {professionals.length > 0 && (
+      {professionals.length > 0 && professionals.filter(shouldShowProfessional).length > 0 && (
         <div className="mt-6">
           <h3 className="text-lg font-normal text-gray-500 mb-4">Resultados encontrados</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {professionals.map((professional, index) => (
+            {professionals.filter(shouldShowProfessional).map((professional, index) => (
               <div 
                 key={index} 
                 className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col cursor-pointer"
@@ -1195,9 +1210,14 @@ export function SearchProfessionalsPage() {
         </div>
       )}
 
-      {professionals.length === 0 && searchMessage && !searchLoading && (
+      {(professionals.length === 0 || professionals.filter(shouldShowProfessional).length === 0) && searchMessage && !searchLoading && (
         <div className="mt-6 text-center text-gray-500">
-          <p>Nenhum profissional encontrado com os filtros aplicados.</p>
+          <p>
+            {professionals.length === 0 
+              ? "Nenhum profissional encontrado com os filtros aplicados." 
+              : "Nenhum profissional com perfil completo encontrado com os filtros aplicados."
+            }
+          </p>
         </div>
       )}
 

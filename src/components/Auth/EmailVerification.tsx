@@ -4,6 +4,8 @@ import { AuthResponse } from '../../types';
 import { useApiMessage } from '../../hooks/useApiMessage';
 import { ApiMessage } from '../UI/ApiMessage';
 import { ERROR_MESSAGES } from '../../config/errorMessages';
+import { useApp } from '../../contexts/AppContext';
+
 
 interface EmailVerificationProps {
   email: string;
@@ -18,6 +20,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
   onBack,
   onGoToLogin,
 }) => {
+  const { dispatch } = useApp();
   const { apiMessage, handleApiError, handleApiSuccess, hideMessage } = useApiMessage();
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,36 +34,55 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
   }, [resendCountdown]);
 
   const handleVerifyCode = async () => {
-    if (!code.trim()) {
-      handleApiError(ERROR_MESSAGES.INVALID_CODE);
-      return;
-    }
+  if (!code.trim()) {
+    handleApiError(ERROR_MESSAGES.INVALID_CODE);
+    return;
+  }
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const authData = await authService.verifyEmail({
-        email,
-        code: code.trim(),
-      });
+  try {
+    const authData = await authService.verifyEmail({
+      email,
+      code: code.trim(),
+    });
 
-      // Mostrar mensagem de sucesso
-      handleApiSuccess(authData.message);
-      
-      // Salvar dados de autenticação
-      authService.saveAuthData(authData.token.access, authData.token.refresh, authData.user);
-      
-      // Aguardar um pouco para mostrar a mensagem de sucesso
-      setTimeout(() => {
-        onVerificationSuccess(authData);
-      }, 1500);
+    // Mostra mensagem de sucesso (ok manter)
+    handleApiSuccess(authData.message);
 
-    } catch (error: any) {
-      handleApiError(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // 🧹 1) Zera completamente qualquer dado da sessão anterior
+    (window as any).vinkoReset?.(); // usa o atalho do AppProvider
+    // (sem o atalho: clearLocalData(); dispatch({ type: 'RESET_ALL' });)
+
+    // 🔐 2) Grava a nova sessão de forma explícita
+    localStorage.setItem('user_id', String(authData.user.id));
+    localStorage.setItem('access_token', authData.token.access);
+    localStorage.setItem('vinko-current-user', JSON.stringify(authData.user));
+
+    // 3) Mantém o service (refresh token etc.)
+    authService.saveAuthData(
+      authData.token.access,
+      authData.token.refresh,
+      authData.user
+    );
+
+    // 🧭 4) Atualiza estado global e entra
+    dispatch({ type: 'SET_USER', payload: authData.user });
+
+    // (mantemos o callback para compatibilidade, se o pai passou)
+    try { onVerificationSuccess?.(authData); } catch {}
+
+    // 🔄 5) Remount completo (evita qualquer resquício visual/timing)
+    window.location.replace('/'); // ajuste a rota se necessário (ex.: '/dashboard')
+
+  } catch (error: any) {
+    handleApiError(error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
 
   const handleResendCode = async () => {
     setIsLoading(true);

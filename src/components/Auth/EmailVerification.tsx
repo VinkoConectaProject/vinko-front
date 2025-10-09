@@ -5,6 +5,7 @@ import { useApiMessage } from '../../hooks/useApiMessage';
 import { ApiMessage } from '../UI/ApiMessage';
 import { ERROR_MESSAGES } from '../../config/errorMessages';
 import { useApp } from '../../contexts/AppContext';
+import { useNavigate } from 'react-router-dom';
 
 
 interface EmailVerificationProps {
@@ -20,6 +21,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
   onBack,
   onGoToLogin,
 }) => {
+  const navigate = useNavigate();
   const { dispatch } = useApp();
   const { apiMessage, handleApiError, handleApiSuccess, hideMessage } = useApiMessage();
   const [code, setCode] = useState('');
@@ -73,7 +75,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
     try { onVerificationSuccess?.(authData); } catch {}
 
     // 🔄 5) Remount completo (evita qualquer resquício visual/timing)
-    window.location.replace('/'); // ajuste a rota se necessário (ex.: '/dashboard')
+    navigate('/'); // navegação SPA sem reload
 
   } catch (error: any) {
     handleApiError(error);

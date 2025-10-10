@@ -189,14 +189,28 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
         </div>
 
         {/* Dicas */}
-        <div className="mt-8 p-4 bg-pink-50 rounded-lg">
-          <h4 className="text-sm font-medium text-pink-800 mb-2">Dicas:</h4>
-          <ul className="text-sm text-pink-700 space-y-1">
-            <li>• Verifique sua caixa de entrada e spam</li>
-            <li>• O código tem 5 dígitos</li>
-            <li>• Aguarde alguns minutos antes de reenviar</li>
-          </ul>
-        </div>
+          <div className="mt-8 p-4 bg-pink-50 rounded-lg">
+            <h4 className="text-sm font-medium text-pink-800 mb-2">Dicas:</h4>
+            <ul className="text-sm text-pink-700 space-y-1">
+              <li>• Verifique sua caixa de entrada e spam</li>
+              <li>• O código tem 5 dígitos</li>
+              <li>• Aguarde alguns minutos antes de reenviar</li>
+            </ul>
+          
+            {/* Suporte */}
+            <p className="mt-4 text-sm text-pink-700">
+              Em caso de problemas na verificação,{' '}
+              <a
+                href="https://wa.me/5548988254592?text=Ol%C3%A1%2C%20Estou%20com%20dificuldades%20na%20etapa%20de%20verifica%C3%A7%C3%A3o%20do%20meu%20e-mail."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-700 font-medium underline hover:text-pink-800 transition-colors"
+              >
+                clique aqui
+              </a>{' '}
+              para falar com o suporte.
+            </p>
+          </div>
       </div>
     </div>
   );

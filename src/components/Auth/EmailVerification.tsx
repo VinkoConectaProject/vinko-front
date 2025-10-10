@@ -6,7 +6,6 @@ import { ApiMessage } from '../UI/ApiMessage';
 import { ERROR_MESSAGES } from '../../config/errorMessages';
 import { useApp } from '../../contexts/AppContext';
 
-
 interface EmailVerificationProps {
   email: string;
   onVerificationSuccess: (authData: AuthResponse) => void;
@@ -34,63 +33,38 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
   }, [resendCountdown]);
 
   const handleVerifyCode = async () => {
-  if (!code.trim()) {
-    handleApiError(ERROR_MESSAGES.INVALID_CODE);
-    return;
-  }
+    if (!code.trim()) {
+      handleApiError(ERROR_MESSAGES.INVALID_CODE);
+      return;
+    }
 
-  setIsLoading(true);
-
-  try {
-    const authData = await authService.verifyEmail({
-      email,
-      code: code.trim(),
-    });
-
-    // Mostra mensagem de sucesso (ok manter)
-    handleApiSuccess(authData.message);
-
-    // 🧹 1) Zera completamente qualquer dado da sessão anterior
-    (window as any).vinkoReset?.(); // usa o atalho do AppProvider
-    // (sem o atalho: clearLocalData(); dispatch({ type: 'RESET_ALL' });)
-
-    // 🔐 2) Grava a nova sessão de forma explícita
-    localStorage.setItem('user_id', String(authData.user.id));
-    localStorage.setItem('access_token', authData.token.access);
-    localStorage.setItem('vinko-current-user', JSON.stringify(authData.user));
-
-    // 3) Mantém o service (refresh token etc.)
-    authService.saveAuthData(
-      authData.token.access,
-      authData.token.refresh,
-      authData.user
-    );
-
-    // 🧭 4) Atualiza estado global e entra
-    dispatch({ type: 'SET_USER', payload: authData.user });
-
-    // (mantemos o callback para compatibilidade, se o pai passou)
-    try { onVerificationSuccess?.(authData); } catch {}
-
-    // 🔄 5) Remount completo (evita qualquer resquício visual/timing)
-    window.location.replace('/'); // ajuste a rota se necessário (ex.: '/dashboard')
-
-  } catch (error: any) {
-    handleApiError(error);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
-
-  const handleResendCode = async () => {
     setIsLoading(true);
 
     try {
-      const result = await authService.resendVerificationCode({ email });
-      handleApiSuccess(result.message);
-      setResendCountdown(60); // 60 segundos de espera
+      const authData = await authService.verifyEmail({
+        email,
+        code: code.trim(),
+      });
+
+      handleApiSuccess(authData.message);
+
+      (window as any).vinkoReset?.();
+
+      localStorage.setItem('user_id', String(authData.user.id));
+      localStorage.setItem('access_token', authData.token.access);
+      localStorage.setItem('vinko-current-user', JSON.stringify(authData.user));
+
+      authService.saveAuthData(
+        authData.token.access,
+        authData.token.refresh,
+        authData.user
+      );
+
+      dispatch({ type: 'SET_USER', payload: authData.user });
+
+      try { onVerificationSuccess?.(authData); } catch {}
+
+      window.location.replace('/');
     } catch (error: any) {
       handleApiError(error);
     } finally {
@@ -98,10 +72,21 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleVerifyCode();
+  const handleResendCode = async () => {
+    setIsLoading(true);
+    try {
+      const result = await authService.resendVerificationCode({ email });
+      handleApiSuccess(result.message);
+      setResendCountdown(60);
+    } catch (error: any) {
+      handleApiError(error);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleVerifyCode();
   };
 
   return (
@@ -114,12 +99,8 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Verificar E-mail
-          </h2>
-          <p className="text-gray-600">
-            Enviamos um código de verificação para:
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Verificar E-mail</h2>
+          <p className="text-gray-600">Enviamos um código de verificação para:</p>
           <p className="text-pink-600 font-medium mt-1 break-words">{email}</p>
         </div>
 
@@ -133,7 +114,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder="Digite o código de 5 dígitos"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors"
             maxLength={5}
@@ -165,10 +146,7 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
             disabled={isLoading || resendCountdown > 0}
             className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {resendCountdown > 0 
-              ? `Reenviar em ${resendCountdown}s` 
-              : 'Reenviar Código'
-            }
+            {resendCountdown > 0 ? `Reenviar em ${resendCountdown}s` : 'Reenviar Código'}
           </button>
 
           <button
@@ -188,30 +166,37 @@ export const EmailVerification: React.FC<EmailVerificationProps> = ({
           </button>
         </div>
 
-        {/* Dicas */}
-          <div className="mt-8 p-4 bg-pink-50 rounded-lg">
-            <h4 className="text-sm font-medium text-pink-800 mb-2">Dicas:</h4>
+        {/* Dicas e Suporte */}
+        <div className="mt-8 space-y-4">
+          {/* Dicas */}
+          <div className="p-4 bg-pink-50 rounded-lg border border-pink-100">
+            <h4 className="text-sm font-semibold text-pink-800 mb-2">Dicas rápidas:</h4>
             <ul className="text-sm text-pink-700 space-y-1">
               <li>• Verifique sua caixa de entrada e spam</li>
               <li>• O código tem 5 dígitos</li>
               <li>• Aguarde alguns minutos antes de reenviar</li>
             </ul>
-          
-            {/* Suporte */}
-            <p className="mt-4 text-sm text-pink-700">
-              Em caso de problemas na verificação,{' '}
-              <a
-                href="https://wa.me/5548988254592?text=Ol%C3%A1%2C%20Estou%20com%20dificuldades%20na%20etapa%20de%20verifica%C3%A7%C3%A3o%20do%20meu%20e-mail."
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-pink-700 font-medium underline hover:text-pink-800 transition-colors"
-              >
-                clique aqui
-              </a>{' '}
-              para falar com o suporte.
-            </p>
           </div>
+
+          {/* Suporte */}
+          <div className="p-4 bg-white border border-pink-200 rounded-lg shadow-sm text-center">
+            <p className="text-sm text-gray-700 font-medium mb-3">
+              Dificuldades para validar seu código?
+            </p>
+            <a
+              href="https://wa.me/5548988254592?text=Ol%C3%A1%2C%20Estou%20com%20dificuldades%20na%20etapa%20de%20verifica%C3%A7%C3%A3o%20do%20meu%20e-mail."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 border border-pink-500 text-pink-600 font-medium py-2 px-4 rounded-lg hover:bg-pink-50 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path d="M20.52 3.48A11.84 11.84 0 0012.06 0C5.5 0 .2 5.3.2 11.86c0 2.1.56 4.06 1.54 5.77L0 24l6.53-1.68a11.77 11.77 0 005.53 1.42h.01c6.56 0 11.86-5.3 11.86-11.86 0-3.17-1.24-6.15-3.41-8.4zM12.06 21.3h-.01a9.46 9.46 0 01-4.83-1.32l-.35-.2-3.88 1 1.04-3.78-.23-.39a9.43 9.43 0 01-1.43-5.08c0-5.22 4.25-9.47 9.48-9.47z" />
+              </svg>
+              Falar com o suporte via WhatsApp
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );
-}; 
+};
